@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { useTheme } from "../context/ThemeContext";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useUserAuth } from "../context/UserAuthContext";
 import Logo from "./ui/Logo";
 
+// Mobile drawer nav (kept from previous design)
 const NAV_ITEMS = [
   { name: "Home", to: "/" },
   { name: "Store", to: "/store" },
@@ -12,278 +12,585 @@ const NAV_ITEMS = [
   { name: "Contact", to: "/contact" },
 ];
 
-const MOBILE_NAV = [
-  { name: "Home", to: "/", color: "text-cyan-500", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
-  { name: "Store", to: "/store", color: "text-yellow-500", icon: "M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" },
-  { name: "About", to: "/about", color: "text-purple-500", icon: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
-  { name: "Contact", to: "/contact", color: "text-green-500", icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
+// Zepto-style top category strip
+const CATEGORY_STRIP = [
+  { name: "All",         to: "/store",                    icon: "🛒" },
+  { name: "Cafe",        to: "/store?category=Beverages", icon: "☕" },
+  { name: "Home",        to: "/store?category=Essentials",icon: "🏠" },
+  { name: "Fresh",       to: "/store?category=Vegetables",icon: "🥬" },
+  { name: "Snacks",      to: "/store?category=Snacks",    icon: "🍿" },
+  { name: "Dairy",       to: "/store?category=Dairy",     icon: "🥛" },
+  { name: "Spices",      to: "/store?category=Spices",    icon: "🌶️" },
+  { name: "Oils",        to: "/store?category=Oil",       icon: "🫒" },
+  { name: "Beauty",      to: "/store",                    icon: "💄" },
+  { name: "Fashion",     to: "/store",                    icon: "👕" },
+];
+
+const LOCATIONS = [
+  "Mumbai, Maharashtra",
+  "Delhi NCR",
+  "Bengaluru, Karnataka",
+  "Hyderabad, Telangana",
+  "Chennai, Tamil Nadu",
+  "Pune, Maharashtra",
 ];
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const { darkMode, toggleTheme } = useTheme();
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(LOCATIONS[0]);
+  const [scrolled, setScrolled] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const { getCartCount } = useCart();
   const { user, logout } = useUserAuth();
   const cartCount = getCartCount();
   const userMenuRef = useRef(null);
+  const locationRef = useRef(null);
+  const mobileSearchInputRef = useRef(null);
+  const location = useLocation();
 
-  // Close user dropdown when clicking outside
+  // Auto-focus the mobile search input when opened
+  useEffect(() => {
+    if (mobileSearchOpen) mobileSearchInputRef.current?.focus();
+  }, [mobileSearchOpen]);
+
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setUserMenuOpen(false);
+      }
+      if (locationRef.current && !locationRef.current.contains(e.target)) {
+        setLocationOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Close panels on route change
+  useEffect(() => {
+    setIsOpen(false);
+    setUserMenuOpen(false);
+    setLocationOpen(false);
+    setMobileSearchOpen(false);
+  }, [location.pathname]);
+
+  // Detect scroll for elevation
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const onSearchSubmit = (e) => {
+    e.preventDefault();
+    if (!searchValue.trim()) return;
+    window.location.href = `/store?search=${encodeURIComponent(searchValue.trim())}`;
+  };
+
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-4 bg-white/70 dark:bg-[#0a0a1a]/80 backdrop-blur-2xl border-b border-gray-200/60 dark:border-white/[0.06] transition-colors duration-300">
-        <div className="max-w-[1200px] mx-auto flex justify-between items-center h-14 sm:h-16 md:h-20">
-          {/* Logo */}
-          <Link to="/" className="flex-shrink-0">
-            <Logo size="lg" />
-          </Link>
+      {/* ===== Zepto-style Header ===== */}
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 bg-white dark:bg-[#0d1117] border-b transition-all duration-300 ${
+          scrolled
+            ? "border-gray-200 dark:border-white/10 shadow-sm"
+            : "border-transparent"
+        }`}
+      >
+        {/* ── MOBILE-ONLY top section (lavender, location + profile + search) ── */}
+        <div className="md:hidden relative bg-violet-100">
+          {/* Row 1: Location + Profile */}
+          <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-2">
+            <button
+              onClick={() => setLocationOpen((v) => !v)}
+              className="flex items-center gap-1 text-left min-w-0 flex-1"
+              aria-label="Choose location"
+            >
+              <div className="min-w-0 max-w-full">
+                <p className="text-[13px] sm:text-sm font-extrabold text-gray-900 flex items-center gap-1 leading-tight">
+                  <span className="truncate">Select Location</span>
+                  <svg
+                    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 transition-transform ${locationOpen ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.6}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </p>
+                <p className="text-[10px] sm:text-[11px] text-gray-700 truncate leading-tight mt-0.5">
+                  {selectedLocation}
+                </p>
+              </div>
+            </button>
 
-          {/* Desktop Menu */}
-          <ul className="hidden md:flex items-center space-x-1">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.name}>
-                <Link to={item.to} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-300">
-                  {item.name}
-                </Link>
-              </li>
-            ))}
-            {/* Theme Toggle */}
-            <li>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Search icon — opens inline search */}
               <button
-                onClick={toggleTheme}
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-300"
+                type="button"
+                onClick={() => setMobileSearchOpen((v) => !v)}
+                aria-label={mobileSearchOpen ? "Close search" : "Open search"}
+                aria-expanded={mobileSearchOpen}
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-gray-300 flex items-center justify-center text-gray-800 shadow-sm hover:bg-gray-50 transition-colors"
               >
-                {darkMode ? (
-                  <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                {mobileSearchOpen ? (
+                  <svg className="w-4 h-4 sm:w-[18px] sm:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 ) : (
-                  <svg className="w-5 h-5 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                  <svg className="w-4 h-4 sm:w-[18px] sm:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 )}
               </button>
-            </li>
-            {/* Cart */}
-            <li>
-              <Link to="/cart" className="ml-1 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 font-bold text-sm rounded-full hover:scale-105 hover:shadow-lg transition-all duration-300 flex items-center gap-2 relative">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-                </svg>
-                Cart
-                {cartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">{cartCount}</span>
+
+              <Link
+                to={user ? "/account" : "/login?redirect=%2Faccount"}
+                aria-label={user ? "Account" : "Sign in"}
+              >
+                {user ? (
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs sm:text-sm font-extrabold shadow-md">
+                    {user.name?.charAt(0).toUpperCase() || "U"}
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-gray-300 flex items-center justify-center text-gray-800 shadow-sm">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
                 )}
               </Link>
-            </li>
-            {/* User Auth */}
-            <li>
-              {user ? (
-                <div className="relative ml-1" ref={userMenuRef}>
+            </div>
+          </div>
+
+          {/* Row 2: Search — inline, collapsible. Visible only when toggled open. */}
+          {mobileSearchOpen && (
+            <div className="px-3 sm:px-4 pb-2.5 sm:pb-3 animate-fade-in-down">
+              <form
+                onSubmit={onSearchSubmit}
+                className="flex items-center gap-2 h-10 sm:h-11 px-3 sm:px-3.5 rounded-xl bg-white shadow-sm"
+              >
+                <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  ref={mobileSearchInputRef}
+                  type="text"
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                  placeholder='Search "kurkure"'
+                  className="flex-1 min-w-0 bg-transparent text-[13px] sm:text-sm text-gray-800 placeholder-gray-500 focus:outline-none"
+                />
+                {searchValue && (
                   <button
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold hover:scale-105 hover:shadow-lg hover:shadow-orange-500/20 transition-all ring-2 ring-transparent hover:ring-orange-400/40"
+                    type="button"
+                    onClick={() => setSearchValue("")}
+                    aria-label="Clear search"
+                    className="w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center flex-shrink-0"
                   >
-                    {user.name?.charAt(0).toUpperCase() || "U"}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.4}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
-                  {/* Dropdown */}
+                )}
+              </form>
+            </div>
+          )}
+
+          {/* Mobile location dropdown */}
+          {locationOpen && (
+            <div className="absolute left-3 right-3 top-full mt-1 rounded-2xl bg-white border border-gray-200 shadow-xl overflow-hidden z-50">
+              <div className="p-3 border-b border-gray-100">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Choose Delivery Location
+                </p>
+              </div>
+              <ul className="max-h-72 overflow-y-auto">
+                {LOCATIONS.map((loc) => (
+                  <li key={loc}>
+                    <button
+                      onClick={() => { setSelectedLocation(loc); setLocationOpen(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm flex items-center gap-2.5 ${
+                        loc === selectedLocation
+                          ? "bg-violet-50 text-violet-700 font-semibold"
+                          : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="truncate">{loc}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* ── DESKTOP top row (logo + location + search + actions) ── */}
+        <div className="hidden md:block max-w-[1280px] mx-auto px-3 sm:px-4">
+          <div className="flex items-center gap-2 sm:gap-4 md:gap-6 py-2.5 sm:py-3">
+            {/* Logo */}
+            <Link to="/" className="flex-shrink-0">
+              <Logo size="md" />
+            </Link>
+
+            {/* Location selector — desktop */}
+            <div className="hidden md:block relative" ref={locationRef}>
+              <button
+                onClick={() => setLocationOpen((v) => !v)}
+                className="flex items-center gap-1.5 px-1 py-2 text-sm text-gray-700 dark:text-white/80 hover:text-gray-900 dark:hover:text-white transition-colors"
+              >
+                <span className="font-semibold">Select Location</span>
+                <svg
+                  className={`w-4 h-4 transition-transform ${locationOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <p className="text-[11px] text-gray-500 dark:text-white/50 -mt-1 truncate max-w-[180px]">
+                {selectedLocation}
+              </p>
+
+              {locationOpen && (
+                <div className="absolute left-0 top-full mt-1 w-72 rounded-2xl bg-white dark:bg-[#11141d] border border-gray-200 dark:border-white/10 shadow-xl overflow-hidden z-50">
+                  <div className="p-3 border-b border-gray-100 dark:border-white/10">
+                    <p className="text-xs font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">
+                      Choose Delivery Location
+                    </p>
+                  </div>
+                  <ul className="max-h-72 overflow-y-auto">
+                    {LOCATIONS.map((loc) => (
+                      <li key={loc}>
+                        <button
+                          onClick={() => {
+                            setSelectedLocation(loc);
+                            setLocationOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 transition-colors ${
+                            loc === selectedLocation
+                              ? "bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 font-semibold"
+                              : "text-gray-700 dark:text-white/80 hover:bg-gray-50 dark:hover:bg-white/5"
+                          }`}
+                        >
+                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="truncate">{loc}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Search bar (visible on all sizes; compact on mobile) */}
+            <form
+              onSubmit={onSearchSubmit}
+              className="flex-1 min-w-0 flex items-center gap-2 h-10 sm:h-11 md:h-12 px-3 sm:px-4 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus-within:border-violet-400 dark:focus-within:border-violet-400 transition-colors"
+            >
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                placeholder='Search for "kurkure"'
+                className="flex-1 min-w-0 bg-transparent text-xs sm:text-sm text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-white/40 focus:outline-none"
+              />
+            </form>
+
+            {/* Right cluster */}
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-4 flex-shrink-0">
+              {/* Login / User */}
+              {user ? (
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                    aria-label="Account menu"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-extrabold">
+                      {user.name?.charAt(0).toUpperCase() || "U"}
+                    </div>
+                    <span className="text-[10px] font-semibold text-gray-700 dark:text-white/80 hidden sm:block">
+                      {user.name?.split(" ")[0] || "Account"}
+                    </span>
+                  </button>
                   {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#1a1a2e] rounded-2xl border border-gray-200/60 dark:border-white/[0.08] shadow-xl shadow-gray-200/40 dark:shadow-black/30 py-2 z-50">
-                      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.06]">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                    <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-white dark:bg-[#11141d] border border-gray-200 dark:border-white/10 shadow-xl overflow-hidden z-50">
+                      <div className="px-4 py-3 border-b border-gray-100 dark:border-white/10 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-extrabold flex-shrink-0">
+                          {user.name?.charAt(0).toUpperCase() || "U"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{user.name}</p>
+                          <p className="text-[11px] text-gray-500 dark:text-white/50 truncate">{user.email}</p>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => {
-                          logout();
-                          setUserMenuOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2.5"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Sign Out
-                      </button>
+                      <div className="p-1.5">
+                        <Link to="/account" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-700 dark:text-white/80 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          My Account
+                        </Link>
+                        <Link to="/account" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-700 dark:text-white/80 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                          </svg>
+                          My Orders
+                        </Link>
+                        <button
+                          onClick={() => { logout(); setUserMenuOpen(false); }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          Sign Out
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               ) : (
                 <Link
                   to="/login"
-                  className="ml-1 w-10 h-10 rounded-xl flex items-center justify-center text-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-300"
-                  title="Sign In"
+                  className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                  aria-label="Login"
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-6 h-6 text-gray-700 dark:text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
+                  <span className="text-[10px] font-semibold text-gray-700 dark:text-white/80 hidden sm:block">
+                    Login
+                  </span>
                 </Link>
               )}
-            </li>
-          </ul>
 
-          {/* Mobile Icons */}
-          <div className="flex items-center gap-1.5 md:hidden">
-            {/* Theme toggle mobile */}
-            <button
-              onClick={toggleTheme}
-              className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
-            >
-              {darkMode ? (
-                <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                </svg>
-              )}
-            </button>
-            {/* Cart */}
-            <Link to="/cart" className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all relative">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-              </svg>
-              {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-orange-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">{cartCount}</span>
-              )}
-            </Link>
-            {/* User icon (mobile) */}
-            {user ? (
+              {/* Cart — redirects to login if not authed, then back to /cart */}
+              <Link
+                to={user ? "/cart" : "/login?redirect=%2Fcart"}
+                className="relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                aria-label="Cart"
+              >
+                <div className="relative">
+                  <svg className="w-6 h-6 text-gray-700 dark:text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                  </svg>
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 bg-violet-600 text-white rounded-full text-[10px] font-extrabold flex items-center justify-center border-2 border-white dark:border-[#0d1117]">
+                      {cartCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] font-semibold text-gray-700 dark:text-white/80 hidden sm:block">
+                  Cart
+                </span>
+              </Link>
+
+              {/* Mobile menu button */}
               <button
                 onClick={() => setIsOpen(true)}
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold"
+                className="lg:hidden w-9 h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-white/80 hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
+                aria-label="Open menu"
               >
-                {user.name?.charAt(0).toUpperCase() || "U"}
-              </button>
-            ) : (
-              <Link to="/login" className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
-              </Link>
-            )}
-            {/* Hamburger */}
-            <button
-              className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
-              onClick={() => setIsOpen(true)}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
+              </button>
+            </div>
           </div>
-        </div>
-      </nav>
 
-      {/* Mobile Overlay */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] md:hidden" onClick={() => setIsOpen(false)} />
-      )}
-
-      {/* Mobile Menu */}
-      <div className={`fixed top-0 left-0 h-full w-[75vw] max-w-[280px] bg-white dark:bg-gray-900/95 backdrop-blur-xl p-5 transform ${isOpen ? "translate-x-0" : "-translate-x-full"} transition-transform duration-300 ease-in-out md:hidden z-[70] border-r border-gray-200 dark:border-white/10`}>
-        <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 absolute top-3 right-3 transition-all text-gray-600 dark:text-white" onClick={() => setIsOpen(false)}>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <div className="mb-6 mt-1">
-          <Logo size="sm" />
         </div>
 
-        {/* User info section in mobile menu */}
-        {user && (
-          <div className="mb-4 px-3 py-3 rounded-xl bg-gray-50 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06]">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                {user.name?.charAt(0).toUpperCase() || "U"}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
-              </div>
+        {/* ── Category strip — icons-above on mobile, inline on desktop. Home page only. ── */}
+        {location.pathname === "/" && (
+          <div className="bg-violet-100 md:bg-white md:border-t md:border-gray-100 dark:md:border-white/[0.06]">
+            <div className="relative max-w-[1280px] mx-auto px-1 sm:px-4">
+              <nav
+                className="flex items-stretch gap-0 md:gap-2 overflow-x-auto no-scrollbar overscroll-x-contain snap-x snap-mandatory"
+                style={{ WebkitOverflowScrolling: "touch" }}
+              >
+                {CATEGORY_STRIP.map((item, i) => {
+                  const isActive = i === 0;
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.to}
+                      className={`relative snap-start flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-2.5 sm:px-3 md:px-4 pt-2 pb-2 md:py-3.5 text-[11px] md:text-sm whitespace-nowrap transition-colors group min-w-[68px] sm:min-w-[72px] md:min-w-0 flex-shrink-0 ${
+                        isActive
+                          ? "text-gray-900 md:text-violet-600 font-extrabold md:font-bold"
+                          : "text-gray-700 dark:text-white/80 hover:text-violet-600 font-semibold"
+                      }`}
+                    >
+                      <span className={`text-[26px] md:text-lg leading-none ${isActive ? "" : "grayscale-[20%] group-hover:grayscale-0"}`}>
+                        {item.icon}
+                      </span>
+                      {item.name}
+                      {isActive && (
+                        <span className="absolute bottom-0 left-2.5 right-2.5 md:left-0 md:right-0 h-[3px] md:h-0.5 bg-gray-900 md:bg-violet-600 rounded-t" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+              {/* Soft fade hint on the right edge — only on mobile */}
+              <div className="md:hidden absolute top-0 right-0 bottom-0 w-6 bg-gradient-to-l from-violet-100 to-transparent pointer-events-none" />
             </div>
           </div>
         )}
+      </header>
 
-        <ul className="space-y-1">
-          {MOBILE_NAV.map((item) => (
-            <li key={item.name}>
-              <Link
+      {/* ===== Mobile Drawer ===== */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed top-0 bottom-0 right-0 w-[320px] max-w-[85vw] z-[70] lg:hidden transition-transform duration-300 bg-white dark:bg-[#0d1117] shadow-2xl ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="h-full p-5 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
+            <Logo size="sm" />
+            <button
+              onClick={() => setIsOpen(false)}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 dark:text-white/80 hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
+              aria-label="Close menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* User block */}
+          {user && (
+            <Link
+              to="/account"
+              className="flex items-center gap-3 p-3 rounded-2xl bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 mb-4"
+            >
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-extrabold flex-shrink-0">
+                {user.name?.charAt(0).toUpperCase() || "U"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{user.name}</p>
+                <p className="text-[11px] text-gray-500 dark:text-white/50 truncate">{user.email}</p>
+              </div>
+            </Link>
+          )}
+
+          {/* Location (mobile) */}
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 mb-4">
+            <svg className="w-4 h-4 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Delivering to</p>
+              <p className="text-xs font-semibold text-gray-800 dark:text-white truncate">{selectedLocation}</p>
+            </div>
+          </div>
+
+          {/* Nav links */}
+          <nav className="space-y-1 flex-1 overflow-y-auto -mx-1 px-1">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.name}
                 to={item.to}
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all text-sm"
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold transition-all ${
+                    isActive
+                      ? "bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                      : "text-gray-700 dark:text-white/85 hover:bg-gray-100 dark:hover:bg-white/5"
+                  }`
+                }
               >
-                <svg className={`w-5 h-5 ${item.color} flex-shrink-0`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                </svg>
+                <span className="w-8 h-8 rounded-lg bg-white dark:bg-white/10 flex items-center justify-center text-base">
+                  {item.name === "Home" && "🏠"}
+                  {item.name === "Store" && "🛍️"}
+                  {item.name === "About" && "ℹ️"}
+                  {item.name === "Contact" && "✉️"}
+                </span>
+                {item.name}
+              </NavLink>
+            ))}
+
+            <div className="h-px bg-gray-200/60 dark:bg-white/[0.06] my-3" />
+
+            <p className="text-[10px] font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider px-3 py-1.5">
+              Shop by Category
+            </p>
+            {CATEGORY_STRIP.map((item) => (
+              <Link
+                key={item.name}
+                to={item.to}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-white/85 hover:bg-gray-100 dark:hover:bg-white/5 transition-all"
+              >
+                <span className="text-lg w-7">{item.icon}</span>
                 {item.name}
               </Link>
-            </li>
-          ))}
-          <li className="pt-3">
-            <Link to="/cart" onClick={() => setIsOpen(false)} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 font-bold text-sm">
-              Cart{cartCount > 0 && ` (${cartCount})`}
+            ))}
+          </nav>
+
+          {/* Bottom actions */}
+          <div className="pt-4 border-t border-gray-200/60 dark:border-white/[0.06] space-y-2">
+            <Link
+              to={user ? "/cart" : "/login?redirect=%2Fcart"}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-extrabold transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+              </svg>
+              View Cart{cartCount > 0 && ` (${cartCount})`}
             </Link>
-          </li>
-          {/* Auth links in mobile */}
-          {user ? (
-            <li className="pt-1">
+
+            {user ? (
               <button
-                onClick={() => {
-                  logout();
-                  setIsOpen(false);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all text-sm font-medium"
+                onClick={logout}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all"
               >
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
                 Sign Out
               </button>
-            </li>
-          ) : (
-            <>
-              <li className="pt-1">
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
                 <Link
                   to="/login"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all text-sm"
+                  className="py-2.5 rounded-xl text-center text-sm font-bold border border-gray-200 dark:border-white/10 text-gray-800 dark:text-white"
                 >
-                  <svg className="w-5 h-5 text-orange-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                  </svg>
                   Sign In
                 </Link>
-              </li>
-              <li>
                 <Link
                   to="/signup"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all text-sm"
+                  className="py-2.5 rounded-xl text-center text-sm font-extrabold bg-violet-600 text-white"
                 >
-                  <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                  </svg>
-                  Create Account
+                  Sign Up
                 </Link>
-              </li>
-            </>
-          )}
-        </ul>
-      </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
     </>
   );
 };

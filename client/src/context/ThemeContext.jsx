@@ -1,29 +1,19 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
 
 const ThemeContext = createContext();
 
 export const useTheme = () => useContext(ThemeContext);
 
+// Light-mode-only: dark mode has been disabled per design.
 export const ThemeProvider = ({ children }) => {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem("spmart-theme");
-    return saved ? saved === "dark" : true; // default dark
-  });
-
   useEffect(() => {
     const root = document.documentElement;
-    if (darkMode) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-    localStorage.setItem("spmart-theme", darkMode ? "dark" : "light");
-  }, [darkMode]);
-
-  const toggleTheme = () => setDarkMode((prev) => !prev);
+    root.classList.remove("dark");
+    localStorage.setItem("spmart-theme", "light");
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ darkMode, toggleTheme }}>
+    <ThemeContext.Provider value={{ darkMode: false, toggleTheme: () => {} }}>
       {children}
     </ThemeContext.Provider>
   );

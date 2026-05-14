@@ -18,6 +18,7 @@ const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const userAuthRoutes = require('./routes/userAuthRoutes');
+const contactRoutes = require('./routes/contactRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -38,6 +39,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/user', userAuthRoutes);
+app.use('/api/contact', contactRoutes);
 app.use('/api/admin/profile', profileRoutes);
 app.use('/api/admin', adminRoutes);
 

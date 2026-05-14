@@ -45,6 +45,7 @@ exports.placeOrder = async (req, res) => {
     const total = subtotal + deliveryFee;
 
     const order = new Order({
+      userId: req.userId || null,
       customer,
       shippingAddress,
       items: orderItems,
@@ -59,6 +60,16 @@ exports.placeOrder = async (req, res) => {
     await order.save();
 
     res.status(201).json(order);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /api/user/orders — list orders for the logged-in user (newest first)
+exports.getMyOrders = async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.userId }).sort({ createdAt: -1 });
+    res.status(200).json(orders);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

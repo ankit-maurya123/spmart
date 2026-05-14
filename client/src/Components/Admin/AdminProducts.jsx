@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useProducts, useCategories } from "../../hooks/useProducts";
 import { useAddProduct, useUpdateProduct, useDeleteProduct } from "../../hooks/useAdmin";
 import { resolveProductImage } from "../../lib/imageMap";
 
 const EMPTY_FORM = { name: "", description: "", price: "", oldPrice: "", category: "" };
+const MAX_GALLERY = 10;
 
 export default function AdminProducts() {
   const { data: products, isLoading } = useProducts();
@@ -22,10 +23,31 @@ export default function AdminProducts() {
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+
+  // Gallery (extra images): existing URLs from server + freshly added local Files.
+  const [existingImages, setExistingImages] = useState([]); // string[] — URLs to keep
+  const [galleryFiles, setGalleryFiles] = useState([]);     // File[] — newly added
+  const [galleryPreviews, setGalleryPreviews] = useState([]); // string[] — object URLs
+
+  // Revoke object URLs on unmount / file change to avoid leaks
+  useEffect(() => {
+    return () => {
+      galleryPreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [galleryPreviews]);
 
   const filtered = products?.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   ) ?? [];
+
+  const resetGallery = () => {
+    galleryPreviews.forEach((url) => URL.revokeObjectURL(url));
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
+    setExistingImages([]);
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+  };
 
   const openAdd = () => {
     setEditingId(null);
@@ -34,6 +56,7 @@ export default function AdminProducts() {
     setImageFile(null);
     setImagePreview("");
     setError("");
+    resetGallery();
     setModalOpen(true);
   };
 
@@ -50,6 +73,8 @@ export default function AdminProducts() {
     setImageFile(null);
     setImagePreview(resolveProductImage(product));
     setError("");
+    resetGallery();
+    setExistingImages(Array.isArray(product.images) ? [...product.images] : []);
     setModalOpen(true);
   };
 
@@ -73,6 +98,32 @@ export default function AdminProducts() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  // ─── Gallery handlers ────────────────────────────────
+  const addGalleryFiles = (filesList) => {
+    const incoming = Array.from(filesList || []).filter((f) => f.type.startsWith("image/"));
+    if (!incoming.length) return;
+
+    const slotsLeft = MAX_GALLERY - (existingImages.length + galleryFiles.length);
+    const accepted = incoming.slice(0, slotsLeft);
+    if (!accepted.length) return;
+
+    const previews = accepted.map((f) => URL.createObjectURL(f));
+    setGalleryFiles((prev) => [...prev, ...accepted]);
+    setGalleryPreviews((prev) => [...prev, ...previews]);
+
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+  };
+
+  const removeExisting = (url) => {
+    setExistingImages((prev) => prev.filter((u) => u !== url));
+  };
+
+  const removeGalleryFile = (idx) => {
+    URL.revokeObjectURL(galleryPreviews[idx]);
+    setGalleryFiles((prev) => prev.filter((_, i) => i !== idx));
+    setGalleryPreviews((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setError("");
@@ -91,6 +142,12 @@ export default function AdminProducts() {
 
     if (imageFile) {
       fd.append("image", imageFile);
+    }
+
+    // Gallery: send each new file under "images" + JSON list of URLs to keep
+    galleryFiles.forEach((f) => fd.append("images", f));
+    if (editingId) {
+      fd.append("existingImages", JSON.stringify(existingImages));
     }
 
     const callbacks = {
@@ -336,6 +393,78 @@ export default function AdminProducts() {
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   className="hidden"
                   onChange={(e) => handleFileSelect(e.target.files[0])}
+                />
+              </div>
+
+              {/* Gallery (additional images) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    Additional Images <span className="text-gray-400 font-normal">(optional, up to {MAX_GALLERY})</span>
+                  </label>
+                  <span className="text-[10px] text-gray-400">
+                    {existingImages.length + galleryFiles.length} / {MAX_GALLERY}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {/* Existing (server) images */}
+                  {existingImages.map((url) => (
+                    <div key={`ex-${url}`} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-white/[0.1] bg-gray-50 dark:bg-white/[0.03]">
+                      <img src={url} alt="Existing" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeExisting(url)}
+                        aria-label="Remove image"
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all flex items-center justify-center"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.4}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Newly added (local File) previews */}
+                  {galleryPreviews.map((url, i) => (
+                    <div key={`new-${i}`} className="relative group aspect-square rounded-xl overflow-hidden border border-cyan-200 dark:border-cyan-500/30 bg-gray-50 dark:bg-white/[0.03]">
+                      <img src={url} alt={`New ${i + 1}`} className="w-full h-full object-cover" />
+                      <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-cyan-600/90 text-white text-[9px] font-bold uppercase tracking-wide">New</span>
+                      <button
+                        type="button"
+                        onClick={() => removeGalleryFile(i)}
+                        aria-label="Remove image"
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all flex items-center justify-center"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.4}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* "Add" tile */}
+                  {existingImages.length + galleryFiles.length < MAX_GALLERY && (
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-white/[0.1] hover:border-cyan-400 dark:hover:border-cyan-400 bg-gray-50 dark:bg-white/[0.03] flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-cyan-600 transition-colors"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="text-[10px] font-semibold">Add image</span>
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={(e) => addGalleryFiles(e.target.files)}
                 />
               </div>
 

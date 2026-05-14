@@ -5,6 +5,7 @@ import { CartProvider } from "./context/CartContext";
 import { AdminAuthProvider } from "./context/AdminAuthContext";
 import { UserAuthProvider } from "./context/UserAuthContext";
 import Layout from "./Components/Layout";
+import RequireAuth from "./Components/RequireAuth";
 import Home from "./Components/Pages/Home";
 import Store from "./Components/Pages/Store";
 import ProductDetails from "./Components/Pages/ProductDetails";
@@ -16,6 +17,17 @@ import OrderConfirmation from "./Components/Pages/OrderConfirmation";
 import NotFound from "./Components/Pages/NotFound";
 import UserLogin from "./Components/Pages/UserLogin";
 import UserSignup from "./Components/Pages/UserSignup";
+import AccountLayout from "./Components/Account/AccountLayout";
+import AccountOverview from "./Components/Account/AccountOverview";
+import AccountProfile from "./Components/Account/AccountProfile";
+import AccountOrders from "./Components/Account/AccountOrders";
+import AccountAddresses from "./Components/Account/AccountAddresses";
+import AccountWishlist from "./Components/Account/AccountWishlist";
+import AccountWallet from "./Components/Account/AccountWallet";
+import AccountCoupons from "./Components/Account/AccountCoupons";
+import AccountNotifications from "./Components/Account/AccountNotifications";
+import AccountChangePassword from "./Components/Account/AccountChangePassword";
+import AccountSupport from "./Components/Account/AccountSupport";
 import AdminLogin from "./Components/Admin/AdminLogin";
 import AdminLayout from "./Components/Admin/AdminLayout";
 import Dashboard from "./Components/Admin/Dashboard";
@@ -54,9 +66,21 @@ export default function App() {
                   <Route path="product/:id" element={<ProductDetails />} />
                   <Route path="about" element={<About />} />
                   <Route path="contact" element={<Contact />} />
-                  <Route path="cart" element={<Cart />} />
-                  <Route path="checkout" element={<Checkout />} />
-                  <Route path="order-confirmation/:orderNumber" element={<OrderConfirmation />} />
+                  <Route path="cart"     element={<RequireAuth><Cart /></RequireAuth>} />
+                  <Route path="checkout" element={<RequireAuth><Checkout /></RequireAuth>} />
+                  <Route path="order-confirmation/:orderNumber" element={<RequireAuth><OrderConfirmation /></RequireAuth>} />
+                  <Route path="account" element={<RequireAuth><AccountLayout /></RequireAuth>}>
+                    <Route index element={<AccountOverview />} />
+                    <Route path="profile"       element={<AccountProfile />} />
+                    <Route path="orders"        element={<AccountOrders />} />
+                    <Route path="addresses"     element={<AccountAddresses />} />
+                    <Route path="wishlist"      element={<AccountWishlist />} />
+                    <Route path="wallet"        element={<AccountWallet />} />
+                    <Route path="coupons"       element={<AccountCoupons />} />
+                    <Route path="notifications" element={<AccountNotifications />} />
+                    <Route path="password"      element={<AccountChangePassword />} />
+                    <Route path="support"       element={<AccountSupport />} />
+                  </Route>
                   <Route path="*" element={<NotFound />} />
                 </Route>
                 <Route path="/admin/login" element={<AdminLogin />} />

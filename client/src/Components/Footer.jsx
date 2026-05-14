@@ -1,10 +1,27 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import { useTheme } from "../context/ThemeContext";
 import Logo from "./ui/Logo";
 
 const Footer = () => {
   const { darkMode } = useTheme();
+  const [subscribeEmail, setSubscribeEmail] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    if (!subscribeEmail.trim() || subscribing) return;
+    setSubscribing(true);
+    try {
+      await axios.post("/api/contact/subscribe", { email: subscribeEmail.trim() });
+      setSubscribeEmail("");
+    } catch {
+      // silent fail to keep design unchanged
+    } finally {
+      setSubscribing(false);
+    }
+  };
 
   return (
     <footer className="bg-white/80 dark:bg-[#0a0a1a]/90 backdrop-blur-2xl text-gray-800 dark:text-white py-8 sm:py-10 mt-16 sm:mt-20 border-t border-gray-200/80 dark:border-white/[0.06] transition-colors duration-300">
@@ -71,16 +88,19 @@ const Footer = () => {
           <div className="sm:col-span-2 lg:col-span-1">
             <h3 className="text-sm sm:text-base font-bold mb-3 sm:mb-4 text-yellow-600 dark:text-yellow-400">Newsletter</h3>
             <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm mb-3">Get the latest deals & offers in your inbox.</p>
-            <div className="flex gap-2 max-w-sm">
+            <form onSubmit={handleSubscribe} className="flex gap-2 max-w-sm">
               <input
                 type="email"
+                required
+                value={subscribeEmail}
+                onChange={(e) => setSubscribeEmail(e.target.value)}
                 placeholder="Your email"
                 className="min-w-0 flex-1 bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs sm:text-sm text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-yellow-400/50 transition-all"
               />
-              <button className="px-3 sm:px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 font-bold text-xs sm:text-sm rounded-lg hover:scale-105 transition-all duration-300 flex-shrink-0">
+              <button type="submit" className="px-3 sm:px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 font-bold text-xs sm:text-sm rounded-lg hover:scale-105 transition-all duration-300 flex-shrink-0">
                 Join
               </button>
-            </div>
+            </form>
           </div>
         </div>
 

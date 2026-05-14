@@ -36,12 +36,22 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
 
+// Accepts one primary `image` and up to 10 gallery `images`
+const MAX_GALLERY_IMAGES = 10;
+const fieldsHandler = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'images', maxCount: MAX_GALLERY_IMAGES },
+]);
+
 // Wrapper to catch multer errors and return proper JSON response
 const handleUpload = (req, res, next) => {
-  upload.single('image')(req, res, (err) => {
+  fieldsHandler(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ error: `Too many gallery images. Limit is ${MAX_GALLERY_IMAGES}.` });
       }
       return res.status(400).json({ error: err.message });
     }

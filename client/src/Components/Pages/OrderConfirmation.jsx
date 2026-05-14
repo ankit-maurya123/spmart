@@ -1,11 +1,17 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import usePageMeta from "../../hooks/usePageMeta";
 
 const STATUS_STEPS = ["pending", "confirmed", "processing", "shipped", "delivered"];
 
 export default function OrderConfirmation() {
   const { orderNumber } = useParams();
+  usePageMeta({
+    title: orderNumber ? `Order ${orderNumber}` : "Order Confirmation",
+    description: "Track your SPMart order status — pending, confirmed, shipped or delivered.",
+    noIndex: true,
+  });
 
   const { data: order, isLoading, error } = useQuery({
     queryKey: ["order", orderNumber],
@@ -18,7 +24,7 @@ export default function OrderConfirmation() {
 
   if (isLoading) {
     return (
-      <div className="pt-20 md:pt-24 pb-12 min-h-screen flex items-center justify-center">
+      <div className="pt-4 sm:pt-6 pb-12 min-h-screen flex items-center justify-center">
         <svg className="w-8 h-8 animate-spin text-yellow-500" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -29,7 +35,7 @@ export default function OrderConfirmation() {
 
   if (error || !order) {
     return (
-      <div className="pt-20 md:pt-24 pb-12 min-h-screen">
+      <div className="pt-4 sm:pt-6 pb-12 min-h-screen">
         <div className="max-w-lg mx-auto px-4 text-center py-16">
           <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-500/10 flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -49,7 +55,7 @@ export default function OrderConfirmation() {
   const currentStep = STATUS_STEPS.indexOf(order.status);
 
   return (
-    <div className="pt-20 md:pt-24 pb-12 min-h-screen">
+    <div className="pt-4 sm:pt-6 pb-12 min-h-screen">
       <div className="max-w-3xl mx-auto px-4">
         {/* Success header */}
         <div className="text-center mb-8">

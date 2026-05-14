@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import usePageMeta from "../../hooks/usePageMeta";
 
 const STATS = [
   { value: "10K+", label: "Customers" },
@@ -39,6 +40,12 @@ const VALUES = [
 ];
 
 const About = () => {
+  usePageMeta({
+    title: "About Us",
+    description:
+      "SPMart brings your local kirana shopping online. Learn how we partner with trusted suppliers and small businesses to deliver fresh groceries in 30 minutes.",
+  });
+
   return (
     <div className="pt-20 md:pt-24 pb-12 min-h-screen">
       <div className="max-w-[1200px] mx-auto px-4">

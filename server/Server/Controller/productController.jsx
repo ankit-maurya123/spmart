@@ -3,14 +3,59 @@ const path = require('path');
 const Product = require('../Model/product.jsx');
 const Category = require('../Model/category.jsx');
 
-// Add a new product
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+const fileToUrl = (file) => '/uploads/' + file.filename;
+
+const cleanupAllUploads = (req) => {
+  const all = [];
+  if (req.files?.image) all.push(...req.files.image);
+  if (req.files?.images) all.push(...req.files.images);
+  for (const f of all) {
+    fs.unlink(f.path, () => {});
+  }
+};
+
+const removeUploadedFile = (url) => {
+  if (!url || typeof url !== 'string' || !url.startsWith('/uploads/')) return;
+  const filePath = path.join(__dirname, '..', '..', url);
+  fs.unlink(filePath, () => {});
+};
+
+// Parse `existingImages` from FormData (sent as JSON string) — used during edit
+// to tell us which already-uploaded URLs to keep.
+const parseExistingImages = (raw) => {
+  if (!raw) return null;
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+// ─── Add a new product ────────────────────────────────────────────────
 exports.addProduct = async (req, res) => {
   try {
     const data = { ...req.body };
 
-    if (req.file) {
-      data.image = '/uploads/' + req.file.filename;
+    // Primary image — required for new products
+    const primary = req.files?.image?.[0];
+    if (primary) {
+      data.image = fileToUrl(primary);
     }
+
+    // Gallery images — optional
+    const gallery = req.files?.images || [];
+    if (gallery.length) {
+      data.images = gallery.map(fileToUrl);
+    } else {
+      delete data.images;
+    }
+
+    // existingImages doesn't apply on add — strip it out so it isn't saved
+    delete data.existingImages;
 
     if (data.price) data.price = Number(data.price);
     if (data.oldPrice) data.oldPrice = Number(data.oldPrice);
@@ -19,15 +64,12 @@ exports.addProduct = async (req, res) => {
     await newProduct.save();
     res.status(201).json(newProduct);
   } catch (error) {
-    // Clean up uploaded file on validation error
-    if (req.file) {
-      fs.unlink(req.file.path, () => {});
-    }
+    cleanupAllUploads(req);
     res.status(400).json({ error: error.message });
   }
 };
 
-// Get all products with optional filtering and sorting
+// ─── Get all products ─────────────────────────────────────────────────
 exports.getAllProducts = async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, sort } = req.query;
@@ -61,7 +103,7 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
-// Get distinct categories (merged from products + Category model)
+// ─── Categories ───────────────────────────────────────────────────────
 exports.getCategories = async (req, res) => {
   try {
     const [productCats, savedCats] = await Promise.all([
@@ -76,7 +118,7 @@ exports.getCategories = async (req, res) => {
   }
 };
 
-// Get a single product
+// ─── Get one ──────────────────────────────────────────────────────────
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -89,40 +131,56 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-// Update a product
+// ─── Update ───────────────────────────────────────────────────────────
 exports.updateProduct = async (req, res) => {
   try {
     const data = { ...req.body };
+    const oldProduct = await Product.findById(req.params.id);
+    if (!oldProduct) {
+      cleanupAllUploads(req);
+      return res.status(404).json({ error: 'Product not found' });
+    }
 
-    if (req.file) {
-      data.image = '/uploads/' + req.file.filename;
+    // Primary image — replace if a new file was uploaded
+    const primary = req.files?.image?.[0];
+    if (primary) {
+      data.image = fileToUrl(primary);
+    }
+
+    // Gallery: keep the URLs the client says to keep + append any newly uploaded
+    const newGallery = (req.files?.images || []).map(fileToUrl);
+    const kept = parseExistingImages(req.body.existingImages);
+    delete data.existingImages;
+
+    if (kept !== null || newGallery.length) {
+      const previous = Array.isArray(oldProduct.images) ? oldProduct.images : [];
+      const keepList = kept !== null ? kept : previous;
+      data.images = [...keepList, ...newGallery];
+
+      // Delete files for any old gallery image that the client removed
+      for (const url of previous) {
+        if (!keepList.includes(url)) removeUploadedFile(url);
+      }
     }
 
     if (data.price) data.price = Number(data.price);
     if (data.oldPrice) data.oldPrice = Number(data.oldPrice);
 
-    const oldProduct = await Product.findById(req.params.id);
-    if (!oldProduct) {
-      if (req.file) fs.unlink(req.file.path, () => {});
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
     const product = await Product.findByIdAndUpdate(req.params.id, data, { new: true });
 
-    // Delete old file if a new image was uploaded and old was a local upload
-    if (req.file && oldProduct.image && oldProduct.image.startsWith('/uploads/')) {
-      const oldPath = path.join(__dirname, '..', '..', oldProduct.image);
-      fs.unlink(oldPath, () => {});
+    // If primary was replaced, remove the old primary file
+    if (primary && oldProduct.image && oldProduct.image.startsWith('/uploads/') && oldProduct.image !== data.image) {
+      removeUploadedFile(oldProduct.image);
     }
 
     res.status(200).json(product);
   } catch (error) {
-    if (req.file) fs.unlink(req.file.path, () => {});
+    cleanupAllUploads(req);
     res.status(400).json({ error: error.message });
   }
 };
 
-// Delete a product
+// ─── Delete ───────────────────────────────────────────────────────────
 exports.deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
@@ -130,10 +188,9 @@ exports.deleteProduct = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    // Delete uploaded image file if it's a local upload
-    if (product.image && product.image.startsWith('/uploads/')) {
-      const filePath = path.join(__dirname, '..', '..', product.image);
-      fs.unlink(filePath, () => {});
+    removeUploadedFile(product.image);
+    if (Array.isArray(product.images)) {
+      for (const url of product.images) removeUploadedFile(url);
     }
 
     res.status(200).json({ message: 'Product deleted successfully' });

@@ -21,7 +21,20 @@
       "Bash(gh repo *)",
       "Bash(rm \"client/src/assets/images/Banner-design.htm\")",
       "Bash(rm -rf \"client/src/assets/images/Banner-design_files\")",
-      "Bash(git -c user.email=\"mauryankit071@gmail.com\" -c user.name=\"ankit-maurya123\" commit --amend --no-edit)"
+      "Bash(git -c user.email=\"mauryankit071@gmail.com\" -c user.name=\"ankit-maurya123\" commit --amend --no-edit)",
+      "Bash(git push *)",
+      "Bash(where winword *)",
+      "Read(//c/Program Files/Microsoft Office/**)",
+      "Bash(powershell *)",
+      "Bash(tasklist)",
+      "Bash(mongosh --quiet --eval \"use spmart; db.getCollectionNames\\(\\); db.users.countDocuments\\(\\); db.products.countDocuments\\(\\); db.orders.countDocuments\\(\\); db.reviews.countDocuments\\(\\); db.contacts.countDocuments\\(\\); db.subscribers.countDocuments\\(\\); db.adminprofiles.countDocuments\\(\\);\")",
+      "PowerShell(Get-Command *)",
+      "Bash(npx vite *)",
+      "Bash(kill %1)",
+      "Bash(jobs -l)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(npx eslint *)",
+      "Bash(findstr node *)"
     ]
   }
 }

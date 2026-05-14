@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
+import usePageMeta from "../../hooks/usePageMeta";
 
 const INFO_CARDS = [
   {
@@ -26,18 +28,35 @@ const INFO_CARDS = [
 ];
 
 const Contact = () => {
+  usePageMeta({
+    title: "Contact Us",
+    description:
+      "Get in touch with SPMart support. Email support@spmart.com, call us, or send a message — we typically reply within a few hours.",
+  });
   const [formData, setFormData] = useState({ name: "", email: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    if (errorMsg) setErrorMsg("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
-    setFormData({ name: "", email: "", message: "" });
-    setTimeout(() => setSubmitted(false), 4000);
+    setSubmitting(true);
+    setErrorMsg("");
+    try {
+      await axios.post("/api/contact", formData);
+      setSubmitted(true);
+      setFormData({ name: "", email: "", message: "" });
+      setTimeout(() => setSubmitted(false), 4000);
+    } catch (err) {
+      setErrorMsg(err?.response?.data?.error || "Failed to send message. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

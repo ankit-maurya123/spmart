@@ -52,23 +52,104 @@ const imageMap = {
 };
 
 /**
- * Resolves the best image source for a product.
- * Priority: local import (product.img) -> imageKey map -> URL string -> placeholder
+ * Resolves a single image entry. An "entry" can be:
+ *   - an imageKey string ("product1") → mapped to a bundled asset
+ *   - a URL string ("/uploads/abc.png" or "https://...") → returned as-is
+ *   - falsy → null
+ */
+function resolveOne(entry) {
+  if (!entry) return null;
+  if (typeof entry !== "string") return null;
+  if (imageMap[entry]) return imageMap[entry];          // imageKey
+  return entry;                                         // URL or path
+}
+
+/**
+ * Resolves the best primary image source for a product.
+ * Priority: local import (product.img) -> images[0] -> imageKey -> image URL -> placeholder
  */
 export function resolveProductImage(product) {
-  // Home page products have .img set to a Vite-imported asset
+  if (!product) return "https://placehold.co/400x400?text=No+Image";
+
   if (product.img) return product.img;
 
-  // DB products have imageKey
+  if (Array.isArray(product.images) && product.images.length) {
+    const first = resolveOne(product.images[0]);
+    if (first) return first;
+  }
+
   if (product.imageKey && imageMap[product.imageKey]) {
     return imageMap[product.imageKey];
   }
 
-  // Fallback to the image URL string from DB
   if (product.image) return product.image;
 
-  // Last resort placeholder
   return "https://placehold.co/400x400?text=No+Image";
+}
+
+/**
+ * Resolves the full multi-image gallery for a product → array of asset URLs.
+ * Uses product.images[] when available, otherwise falls back to a single-image array.
+ * De-duplicates and filters out unresolvable entries.
+ *
+ * @param {object} product
+ * @param {number} minCount - optional minimum number of images. If the resolved
+ *   list is shorter, the helper pads it with sibling assets from imageMap so
+ *   UI like the circular orbit gallery always has enough thumbnails to fill.
+ */
+export function resolveProductImages(product, minCount = 1) {
+  if (!product) return [];
+
+  const out = [];
+  const push = (src) => { if (src && !out.includes(src)) out.push(src); };
+
+  if (Array.isArray(product.images)) {
+    for (const entry of product.images) push(resolveOne(entry));
+  }
+
+  // Always include the resolved primary at index 0
+  push(resolveProductImage(product));
+
+  // Move primary to front so consumers see it first
+  const primary = resolveProductImage(product);
+  if (primary && out.indexOf(primary) > 0) {
+    out.splice(out.indexOf(primary), 1);
+    out.unshift(primary);
+  }
+
+  // Pad with sibling assets up to minCount (deterministic — same product → same pad order)
+  if (out.length < minCount) {
+    const allAssets = Object.values(imageMap);
+    const id = product._id || product.imageKey || product.name || "x";
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+
+    for (let k = 0; k < allAssets.length && out.length < minCount; k++) {
+      const candidate = allAssets[(h + k) % allAssets.length];
+      if (candidate) push(candidate);
+    }
+  }
+
+  return out.length ? out : [resolveProductImage(product)];
+}
+
+/**
+ * Build a gallery list of N images using ONLY this product's own images.
+ * If the product has fewer unique images than `count`, the list is filled
+ * by cycling its own images (never pulled from sibling products).
+ *
+ * Useful for the PDP image gallery where every thumbnail must belong to
+ * the active product (no padding from unrelated catalog assets).
+ */
+export function resolveGalleryImages(product, count = 6) {
+  const unique = resolveProductImages(product, 1); // dedup'd, no sibling padding
+  if (!unique.length) return [];
+
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    out.push(unique[i % unique.length]);
+  }
+  return out;
 }
 
 export default imageMap;

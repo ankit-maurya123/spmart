@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
+import usePageMeta from "../../hooks/usePageMeta";
 
 const NotFound = () => {
+  usePageMeta({ title: "404 — Page Not Found", noIndex: true });
   return (
     <div className="pt-20 md:pt-24 pb-12 min-h-screen flex items-center justify-center">
       <div className="max-w-[1200px] mx-auto px-4 text-center animate-fade-in-up">

@@ -2,8 +2,14 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useUserAuth } from "../../context/UserAuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import usePageMeta from "../../hooks/usePageMeta";
 
 export default function UserSignup() {
+  usePageMeta({
+    title: "Sign Up",
+    description: "Create your free SPMart account to order daily groceries with 10-minute delivery and exclusive offers.",
+    noIndex: true,
+  });
   const { register } = useUserAuth();
   const { darkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();

@@ -4,8 +4,10 @@ import { useCart } from "../../context/CartContext";
 import { useUserAuth } from "../../context/UserAuthContext";
 import { resolveProductImage } from "../../lib/imageMap";
 import axios from "axios";
+import usePageMeta from "../../hooks/usePageMeta";
 
 export default function Checkout() {
+  usePageMeta({ title: "Checkout", description: "Complete your SPMart order — fast and secure checkout.", noIndex: true });
   const { items, getCartTotal, getCartCount, clearCart } = useCart();
   const { user } = useUserAuth();
   const navigate = useNavigate();
@@ -89,7 +91,9 @@ export default function Checkout() {
         notes: form.notes.trim(),
       };
 
-      const { data } = await axios.post("/api/orders", orderData);
+      const { data } = await axios.post("/api/orders", orderData, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
       clearCart();
       navigate(`/order-confirmation/${data.orderNumber}`);
     } catch (err) {
