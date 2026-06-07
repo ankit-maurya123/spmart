@@ -79,7 +79,6 @@ export default function ManagerLogin() {
                   onChange={(e) => { setForm({ ...form, password: e.target.value }); setErr(""); }}
                   placeholder="••••••••"
                   required
-                  minLength={6}
                   className="w-full px-3.5 py-3 pr-10 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-400 transition-colors"
                 />
                 <button
