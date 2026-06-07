@@ -16,6 +16,21 @@ const getManagerCreds = () => ({
   password: process.env.MANAGER_PASSWORD || DEFAULT_MANAGER_PASS,
 });
 
+// jsonwebtoken throws an opaque "secretOrPrivateKey must have a value" when the
+// secret is undefined — common on a fresh Vercel deploy where the env var was
+// forgotten. Catch it early and return a helpful, debuggable message instead.
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    const err = new Error(
+      'Server is misconfigured: JWT_SECRET env var is not set. Add it under Vercel → Project → Settings → Environment Variables and redeploy.'
+    );
+    err.status = 500;
+    throw err;
+  }
+  return secret;
+}
+
 // POST /api/auth/login — admin only (kept for backward compatibility)
 exports.login = async (req, res) => {
   try {
@@ -32,13 +47,13 @@ exports.login = async (req, res) => {
 
     const token = jwt.sign(
       { email, role: 'admin' },
-      process.env.JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
     res.status(200).json({ token, email, role: 'admin' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   }
 };
 
@@ -65,13 +80,13 @@ exports.managerLogin = async (req, res) => {
 
     const token = jwt.sign(
       { email, role },
-      process.env.JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
     res.status(200).json({ token, email, role });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   }
 };
 
@@ -84,7 +99,7 @@ exports.verify = async (req, res) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
 
     res.status(200).json({ email: decoded.email, role: decoded.role });
   } catch (error) {
