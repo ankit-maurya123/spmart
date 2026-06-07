@@ -18,7 +18,7 @@ const NAV = [
     to: "/",
     match: (p) => p === "/",
     icon: (active) => (
-      <svg className="w-[22px] h-[22px]" fill={active ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={active ? 0 : 1.8}>
+      <svg className="w-[19px] h-[19px]" fill={active ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={active ? 0 : 1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
       </svg>
     ),
@@ -29,7 +29,7 @@ const NAV = [
     to: "/store",
     match: (p) => p.startsWith("/store") || p.startsWith("/product"),
     icon: () => (
-      <svg className="w-[22px] h-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+      <svg className="w-[19px] h-[19px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm0 10a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10-10a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zm0 10a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
       </svg>
     ),
@@ -40,7 +40,7 @@ const NAV = [
     to: "/account",
     match: (p) => p.startsWith("/account") && p.includes("orders"),
     icon: () => (
-      <svg className="w-[22px] h-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+      <svg className="w-[19px] h-[19px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
       </svg>
     ),
@@ -51,7 +51,7 @@ const NAV = [
     to: "/account",
     match: (p) => p === "/account",
     icon: () => (
-      <svg className="w-[22px] h-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+      <svg className="w-[19px] h-[19px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
       </svg>
     ),
@@ -60,7 +60,7 @@ const NAV = [
 
 const MobileBottomNav = () => {
   const location = useLocation();
-  const { getCartCount } = useCart();
+  const { getCartCount, openCart, isCartOpen } = useCart();
   const { user } = useUserAuth();
   const cartCount = getCartCount();
 
@@ -71,27 +71,26 @@ const MobileBottomNav = () => {
   return (
     <>
       {/* ── Floating Cart pill (only when cart has items) ── */}
-      {cartCount > 0 && location.pathname !== "/cart" && (
-        <Link
-          to={user ? "/cart" : "/login?redirect=%2Fcart"}
-          className="md:hidden fixed left-1/2 -translate-x-1/2 bottom-[72px] z-40 flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white pl-3 pr-4 py-2.5 rounded-full shadow-2xl shadow-rose-500/30 transition-colors"
-          aria-label={`View cart with ${cartCount} item${cartCount !== 1 ? "s" : ""}`}
+      {cartCount > 0 && !isCartOpen && (
+        <button
+          type="button"
+          onClick={openCart}
+          className="md:hidden fixed left-1/2 -translate-x-1/2 bottom-[58px] z-40 inline-flex items-center gap-1.5 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white pl-1.5 pr-3 py-1 rounded-full shadow-lg shadow-rose-500/40 active:scale-95 transition-all duration-200"
+          aria-label={`Open cart with ${cartCount} item${cartCount !== 1 ? "s" : ""}`}
         >
-          <span className="w-9 h-9 rounded-full bg-white text-rose-500 flex items-center justify-center flex-shrink-0">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.4}>
+          <span className="relative w-6 h-6 rounded-full bg-white text-rose-500 flex items-center justify-center flex-shrink-0">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.6}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
             </svg>
+            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[14px] h-3.5 px-0.5 rounded-full bg-amber-400 text-rose-700 text-[8px] font-extrabold border border-white shadow-sm">
+              {cartCount > 99 ? "99+" : cartCount}
+            </span>
           </span>
-          <div className="leading-tight pr-1">
-            <p className="text-sm font-extrabold">Cart</p>
-            <p className="text-[10px] font-semibold opacity-90">
-              {cartCount} item{cartCount !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+          <span className="text-xs font-extrabold tracking-wide leading-none">View Cart</span>
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-        </Link>
+        </button>
       )}
 
       {/* ── Bottom nav bar ── */}
@@ -99,7 +98,7 @@ const MobileBottomNav = () => {
         className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 shadow-[0_-4px_12px_-6px_rgba(0,0,0,0.08)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        <ul className="grid grid-cols-4 h-[64px]">
+        <ul className="grid grid-cols-4 h-[54px]">
           {NAV.map((item) => {
             const active = item.match(location.pathname);
             const requiresAuth = item.key === "orders" || item.key === "account";
@@ -108,23 +107,23 @@ const MobileBottomNav = () => {
               <li key={item.key}>
                 <Link
                   to={href}
-                  className={`h-full flex flex-col items-center justify-center gap-1 transition-colors ${
+                  className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
                     active
                       ? "text-rose-500"
                       : "text-gray-500 hover:text-gray-800"
                   }`}
                 >
-                  {/* Consistent 28x28 icon slot — keeps active home badge aligned with siblings */}
-                  <span className="w-7 h-7 flex items-center justify-center">
+                  {/* Consistent 24x24 icon slot — keeps active home badge aligned with siblings */}
+                  <span className="w-6 h-6 flex items-center justify-center">
                     {item.key === "home" && active ? (
-                      <span className="w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center text-[13px] font-extrabold shadow-sm">
+                      <span className="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center text-[11px] font-extrabold shadow-sm">
                         S
                       </span>
                     ) : (
                       item.icon(active)
                     )}
                   </span>
-                  <span className={`text-[11px] leading-none ${active ? "font-extrabold" : "font-semibold"}`}>
+                  <span className={`text-[10px] leading-none ${active ? "font-extrabold" : "font-semibold"}`}>
                     {item.label}
                   </span>
                 </Link>

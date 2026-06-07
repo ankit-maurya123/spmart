@@ -6,6 +6,7 @@ const {
   getMonthlyReviews,
   getAllReviews,
   deleteReview,
+  updateReviewStatus,
   getCategoryStats,
   addCategory,
   deleteCategory,
@@ -40,6 +41,9 @@ router.get('/reviews/recent', getRecentReviews);
 
 // GET /api/admin/reviews
 router.get('/reviews', getAllReviews);
+
+// PATCH /api/admin/reviews/:id/status — approve / reject
+router.patch('/reviews/:id/status', updateReviewStatus);
 
 // DELETE /api/admin/reviews/:id
 router.delete('/reviews/:id', deleteReview);

@@ -5,14 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#06b6d4" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="color-scheme" content="light" />
 
     <!-- Primary SEO -->
     <title>SPMart — Daily Groceries Delivered in 10 Minutes</title>
     <meta name="description" content="Order daily groceries, fresh vegetables, premium oils, spices, dairy, snacks and household essentials from SPMart. Free delivery on orders ₹499+, 10-minute doorstep delivery and lowest prices guaranteed." />
     <meta name="keywords" content="grocery delivery, online groceries, kirana store online, fresh vegetables, oil, spices, dairy, snacks, atta, rice, dal, 10 minute delivery, SPMart" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="author" content="SPMart" />
+    <link rel="canonical" href="https://spmart.vercel.app/" />
 
     <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
     <meta property="og:type" content="website" />
@@ -20,15 +22,63 @@
     <meta property="og:title" content="SPMart — Daily Groceries Delivered in 10 Minutes" />
     <meta property="og:description" content="Fresh produce, premium oils, spices and everyday essentials delivered to your doorstep in just 10 minutes." />
     <meta property="og:locale" content="en_IN" />
+    <meta property="og:url" content="https://spmart.vercel.app/" />
+    <meta property="og:image" content="https://spmart.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SPMart — Daily Groceries Delivered in 10 Minutes" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="SPMart — Daily Groceries Delivered in 10 Minutes" />
     <meta name="twitter:description" content="Order fresh groceries online from SPMart with free delivery on orders ₹499+." />
+    <meta name="twitter:image" content="https://spmart.vercel.app/og-image.png" />
 
     <!-- Performance hints -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+
+    <!-- JSON-LD: Organization (Google Knowledge Graph) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "SPMart",
+      "legalName": "SP Mart Retail Pvt. Ltd.",
+      "url": "https://spmart.vercel.app/",
+      "logo": "https://spmart.vercel.app/favicon.svg",
+      "description": "Online grocery store delivering fresh vegetables, dairy, oils, spices and household essentials in 10 minutes across India.",
+      "foundingDate": "2024",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Mumbai",
+        "addressRegion": "Maharashtra",
+        "addressCountry": "IN"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Customer Support",
+        "email": "support@spmart.com",
+        "availableLanguage": ["English", "Hindi"]
+      }
+    }
+    </script>
+
+    <!-- JSON-LD: WebSite (sitelinks search box) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "SPMart",
+      "url": "https://spmart.vercel.app/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://spmart.vercel.app/store?search={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

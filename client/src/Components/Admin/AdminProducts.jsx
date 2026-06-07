@@ -1,10 +1,24 @@
 import { useState, useRef, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useProducts, useCategories } from "../../hooks/useProducts";
 import { useAddProduct, useUpdateProduct, useDeleteProduct } from "../../hooks/useAdmin";
 import { resolveProductImage } from "../../lib/imageMap";
 
-const EMPTY_FORM = { name: "", description: "", price: "", oldPrice: "", category: "" };
+const EMPTY_FORM = {
+  name: "",
+  description: "",
+  price: "",
+  oldPrice: "",
+  category: "",
+  brand: "",
+  weight: "",
+  deliveryTime: "10 mins",
+  tags: [],
+  rating: "",
+  stock: 100,
+};
 const MAX_GALLERY = 10;
+const MAX_TAGS = 8;
 
 export default function AdminProducts() {
   const { data: products, isLoading } = useProducts();
@@ -13,10 +27,30 @@ export default function AdminProducts() {
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlCategory = searchParams.get("category") || "";
+
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(urlCategory);
+  const [sortBy, setSortBy] = useState("newest");
+
+  // Keep state in sync if the URL category param changes (e.g. category card click)
+  useEffect(() => {
+    setCategoryFilter(urlCategory);
+  }, [urlCategory]);
+
+  // Reflect dropdown changes back into the URL so the link is shareable / bookmarkable
+  const updateCategoryFilter = (next) => {
+    setCategoryFilter(next);
+    const nextParams = new URLSearchParams(searchParams);
+    if (next) nextParams.set("category", next);
+    else nextParams.delete("category");
+    setSearchParams(nextParams, { replace: true });
+  };
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [tagDraft, setTagDraft] = useState("");
   const [customCategory, setCustomCategory] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -37,9 +71,23 @@ export default function AdminProducts() {
     };
   }, [galleryPreviews]);
 
-  const filtered = products?.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  ) ?? [];
+  const filtered = (() => {
+    const q = search.trim().toLowerCase();
+    let list = (products || []).filter((p) => {
+      if (categoryFilter && p.category !== categoryFilter) return false;
+      if (!q) return true;
+      return (
+        p.name.toLowerCase().includes(q) ||
+        (p.brand || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
+      );
+    });
+    if (sortBy === "price_asc") list = [...list].sort((a, b) => a.price - b.price);
+    else if (sortBy === "price_desc") list = [...list].sort((a, b) => b.price - a.price);
+    else if (sortBy === "rating") list = [...list].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    else if (sortBy === "name") list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    return list;
+  })();
 
   const resetGallery = () => {
     galleryPreviews.forEach((url) => URL.revokeObjectURL(url));
@@ -51,7 +99,8 @@ export default function AdminProducts() {
 
   const openAdd = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, category: categoryFilter || "" });
+    setTagDraft("");
     setCustomCategory(false);
     setImageFile(null);
     setImagePreview("");
@@ -68,7 +117,14 @@ export default function AdminProducts() {
       price: product.price,
       oldPrice: product.oldPrice || "",
       category: product.category,
+      brand: product.brand || "",
+      weight: product.weight || "",
+      deliveryTime: product.deliveryTime || "10 mins",
+      tags: Array.isArray(product.tags) ? [...product.tags] : [],
+      rating: product.rating ?? "",
+      stock: typeof product.stock === "number" ? product.stock : 100,
     });
+    setTagDraft("");
     setCustomCategory(!categories?.includes(product.category));
     setImageFile(null);
     setImagePreview(resolveProductImage(product));
@@ -76,6 +132,31 @@ export default function AdminProducts() {
     resetGallery();
     setExistingImages(Array.isArray(product.images) ? [...product.images] : []);
     setModalOpen(true);
+  };
+
+  // ─── Tag chip helpers ────────────────────────────────
+  const addTag = (raw) => {
+    const cleaned = (raw || "").trim().replace(/,$/, "").trim();
+    if (!cleaned) return;
+    setForm((prev) => {
+      if (prev.tags.includes(cleaned)) return prev;
+      if (prev.tags.length >= MAX_TAGS) return prev;
+      return { ...prev, tags: [...prev.tags, cleaned] };
+    });
+    setTagDraft("");
+  };
+
+  const removeTag = (tag) => {
+    setForm((prev) => ({ ...prev, tags: prev.tags.filter((t) => t !== tag) }));
+  };
+
+  const handleTagKey = (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagDraft);
+    } else if (e.key === "Backspace" && !tagDraft && form.tags.length) {
+      removeTag(form.tags[form.tags.length - 1]);
+    }
   };
 
   const handleFileSelect = (file) => {
@@ -133,12 +214,35 @@ export default function AdminProducts() {
       return;
     }
 
+    // Flush any tag still in the draft buffer
+    const pendingTag = tagDraft.trim();
+    const tags = pendingTag && !form.tags.includes(pendingTag) && form.tags.length < MAX_TAGS
+      ? [...form.tags, pendingTag]
+      : form.tags;
+
     const fd = new FormData();
-    fd.append("name", form.name);
-    if (form.description) fd.append("description", form.description);
+    fd.append("name", form.name.trim());
+    if (form.description) fd.append("description", form.description.trim());
     fd.append("price", Number(form.price));
     if (form.oldPrice) fd.append("oldPrice", Number(form.oldPrice));
-    fd.append("category", form.category);
+    fd.append("category", form.category.trim());
+    if (form.brand) fd.append("brand", form.brand.trim());
+    if (form.weight) fd.append("weight", form.weight.trim());
+    if (form.deliveryTime) fd.append("deliveryTime", form.deliveryTime.trim());
+    if (form.rating !== "" && form.rating != null) {
+      fd.append("rating", Number(form.rating));
+    }
+    if (form.stock !== "" && form.stock != null) {
+      fd.append("stock", Math.max(0, Math.floor(Number(form.stock))));
+    }
+    // Each tag as its own multipart field so the controller receives a string[]
+    // (multer collects repeated same-name fields into an array on req.body).
+    // Always send at least an empty marker on edit so removing all tags persists.
+    if (tags.length === 0 && editingId) {
+      fd.append("tags", JSON.stringify([]));
+    } else {
+      tags.forEach((t) => fd.append("tags", t));
+    }
 
     if (imageFile) {
       fd.append("image", imageFile);
@@ -172,29 +276,90 @@ export default function AdminProducts() {
 
   return (
     <div className="space-y-4">
-      {/* Top bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="relative w-full sm:w-72">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 transition-colors"
-          />
+      {/* Category-scope banner — appears when arriving via a category card click */}
+      {categoryFilter && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 sm:p-4 rounded-2xl bg-cyan-50/70 dark:bg-cyan-500/10 border border-cyan-200/70 dark:border-cyan-500/20">
+          <div className="flex items-center gap-2 min-w-0">
+            <Link
+              to="/admin/categories"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300 hover:text-cyan-900 dark:hover:text-cyan-100 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              All categories
+            </Link>
+            <span className="text-cyan-400 dark:text-cyan-600">/</span>
+            <span className="text-sm font-semibold text-cyan-900 dark:text-cyan-100 truncate">
+              {categoryFilter}
+            </span>
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-white dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-200 border border-cyan-200 dark:border-cyan-500/30">
+              {filtered.length}
+            </span>
+          </div>
+          <button
+            onClick={() => updateCategoryFilter("")}
+            className="self-start sm:self-auto text-xs font-medium text-cyan-700 dark:text-cyan-300 hover:text-cyan-900 dark:hover:text-cyan-100 transition-colors"
+          >
+            Clear filter
+          </button>
         </div>
-        <button
-          onClick={openAdd}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-200 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Add Product
-        </button>
+      )}
+
+      {/* Top bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 flex-1">
+          <div className="relative flex-1 sm:max-w-xs">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search by name, brand, category..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 transition-colors"
+            />
+          </div>
+
+          <select
+            value={categoryFilter}
+            onChange={(e) => updateCategoryFilter(e.target.value)}
+            className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-yellow-400 transition-colors"
+          >
+            <option value="">All categories</option>
+            {categories?.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-yellow-400 transition-colors"
+          >
+            <option value="newest">Newest</option>
+            <option value="name">Name (A–Z)</option>
+            <option value="price_asc">Price (low → high)</option>
+            <option value="price_desc">Price (high → low)</option>
+            <option value="rating">Rating</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400 px-2">
+            {isLoading ? "Loading..." : `${filtered.length} of ${products?.length ?? 0}`}
+          </span>
+          <button
+            onClick={openAdd}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-200 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Product
+          </button>
+        </div>
       </div>
 
       {/* Table */}
@@ -234,7 +399,14 @@ export default function AdminProducts() {
                           className="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-800"
                         />
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{p.name}</td>
+                      <td className="px-4 py-3 max-w-[220px]">
+                        <div className="font-medium text-gray-900 dark:text-white truncate">{p.name}</div>
+                        {(p.brand || p.weight) && (
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                            {[p.brand, p.weight].filter(Boolean).join(" • ")}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300">
                           {p.category}
@@ -280,7 +452,7 @@ export default function AdminProducts() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
-          <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-[#0e0e24] border border-gray-200/60 dark:border-white/[0.06] shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white dark:bg-[#0e0e24] border border-gray-200/60 dark:border-white/[0.06] shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               {editingId ? "Edit Product" : "Add Product"}
             </h2>
@@ -308,8 +480,8 @@ export default function AdminProducts() {
                 />
               </div>
 
-              {/* Price + Old Price */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Price + Old Price + Rating */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Price (₹)</label>
                   <input
@@ -331,6 +503,120 @@ export default function AdminProducts() {
                     value={form.oldPrice}
                     onChange={(e) => setForm({ ...form, oldPrice: e.target.value })}
                     className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Rating (0–5)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={form.rating}
+                    onChange={(e) => setForm({ ...form, rating: e.target.value })}
+                    placeholder="0.0"
+                    className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Stock — full row with status pill */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Stock (units available)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.stock}
+                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                    placeholder="100"
+                    className="flex-1 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  />
+                  {(() => {
+                    const s = Number(form.stock);
+                    if (!Number.isFinite(s) || s === 0) {
+                      return <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-rose-100 text-rose-700 whitespace-nowrap">Out of Stock</span>;
+                    }
+                    if (s <= 5) {
+                      return <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-amber-100 text-amber-700 whitespace-nowrap">Low Stock</span>;
+                    }
+                    return <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-green-100 text-green-700 whitespace-nowrap">In Stock</span>;
+                  })()}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Set 0 to mark as out of stock. Stock decreases automatically when orders are placed.
+                </p>
+              </div>
+
+              {/* Brand + Weight + Delivery time */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Brand</label>
+                  <input
+                    value={form.brand}
+                    onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                    placeholder="e.g. Amul"
+                    className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Weight / Size</label>
+                  <input
+                    value={form.weight}
+                    onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                    placeholder="e.g. 1 kg, 500 g, 1 L"
+                    className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Delivery</label>
+                  <input
+                    value={form.deliveryTime}
+                    onChange={(e) => setForm({ ...form, deliveryTime: e.target.value })}
+                    placeholder="10 mins"
+                    className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    Tags <span className="text-gray-400 font-normal">(press Enter to add, up to {MAX_TAGS})</span>
+                  </label>
+                  <span className="text-[10px] text-gray-400">{form.tags.length} / {MAX_TAGS}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 px-2 py-2 rounded-xl bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.1] focus-within:border-yellow-400 transition-colors min-h-[44px]">
+                  {form.tags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-100 dark:border-cyan-500/20"
+                    >
+                      {t}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(t)}
+                        className="hover:text-red-500 transition-colors"
+                        aria-label={`Remove ${t}`}
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.4}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    value={tagDraft}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    onKeyDown={handleTagKey}
+                    onBlur={() => addTag(tagDraft)}
+                    placeholder={form.tags.length ? "" : "e.g. Bestseller, Fresh, Premium"}
+                    disabled={form.tags.length >= MAX_TAGS}
+                    className="flex-1 min-w-[120px] bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none px-1"
                   />
                 </div>
               </div>

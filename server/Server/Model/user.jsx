@@ -20,6 +20,22 @@ const addressSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+/**
+ * Wallet transaction sub-schema. Append-only ledger — every credit/debit
+ * pushes a new entry so the user can see their full history.
+ */
+const walletTxnSchema = new mongoose.Schema(
+  {
+    type:        { type: String, enum: ['credit', 'debit'], required: true },
+    amount:      { type: Number, required: true, min: 0 },
+    reason:      { type: String, required: true },
+    orderNumber: { type: String, default: '' },
+    method:      { type: String, default: '' }, // upi / card / netbanking / system
+    status:      { type: String, enum: ['success', 'pending', 'failed'], default: 'success' },
+  },
+  { timestamps: true }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -73,9 +89,32 @@ const userSchema = new mongoose.Schema(
       offers:    { type: Boolean, default: true },
       orderUpd:  { type: Boolean, default: true },
     },
+
+    // Wallet — balance + transaction ledger.
+    // New users get a ₹50 welcome bonus, recorded as their first credit.
+    walletBalance: {
+      type: Number,
+      default: 50,
+      min: 0,
+    },
+    walletTransactions: { type: [walletTxnSchema], default: [] },
   },
   { timestamps: true }
 );
+
+// Seed the welcome-bonus transaction on first save.
+userSchema.pre('save', function (next) {
+  if (this.isNew && (!this.walletTransactions || this.walletTransactions.length === 0)) {
+    this.walletTransactions.push({
+      type: 'credit',
+      amount: 50,
+      reason: 'Welcome bonus',
+      method: 'system',
+      status: 'success',
+    });
+  }
+  next();
+});
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

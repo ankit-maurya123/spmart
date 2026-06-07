@@ -61,9 +61,9 @@ function OrderDetailModal({ order, onClose, onStatusChange, updating }) {
   const currentStep = STATUS_STEPS.indexOf(order.status);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-2xl rounded-2xl bg-white dark:bg-[#0e0e24] border border-gray-200/60 dark:border-white/[0.06] shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-2xl rounded-t-2xl sm:rounded-2xl bg-white dark:bg-[#0e0e24] border border-gray-200/60 dark:border-white/[0.06] shadow-2xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-200/60 dark:border-white/[0.06]">
@@ -111,7 +111,15 @@ function OrderDetailModal({ order, onClose, onStatusChange, updating }) {
             <StatusBadge status={order.status} />
             <PaymentBadge status={order.paymentStatus} />
             <span className="text-xs text-gray-500 capitalize">
-              {order.paymentMethod === "cod" ? "Cash on Delivery" : "Online Payment"}
+              {order.paymentMethod === "cod"
+                ? "Cash on Delivery"
+                : order.paymentMethod === "upi"
+                ? "UPI"
+                : order.paymentMethod === "card"
+                ? "Card"
+                : order.paymentMethod === "wallet"
+                ? "Wallet"
+                : "Online Payment"}
             </span>
           </div>
 
@@ -382,18 +390,126 @@ export default function AdminOrders() {
         ))}
       </div>
 
-      {/* Orders Table */}
-      <div className="rounded-2xl bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm border border-gray-200/60 dark:border-white/[0.06] overflow-hidden">
+      {/* ─── MOBILE: card list (< md) ──────────────────────────── */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-2xl bg-white/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] p-4 animate-pulse">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="space-y-1.5">
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+                  <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
+                <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+              </div>
+              <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+              <div className="h-4 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
+            </div>
+          ))
+        ) : orders?.length > 0 ? (
+          orders.map((order) => (
+            <div
+              key={order._id}
+              className="rounded-2xl bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm border border-gray-200/60 dark:border-white/[0.06] p-4 active:bg-gray-50/50 dark:active:bg-white/[0.02] transition-colors"
+            >
+              {/* Top row — order # + status */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Order</p>
+                  <p className="font-extrabold text-gray-900 dark:text-white text-sm truncate">{order.orderNumber}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    {" · "}
+                    {new Date(order.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+                <StatusBadge status={order.status} />
+              </div>
+
+              {/* Customer + Items */}
+              <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-gray-100 dark:border-white/[0.06]">
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">Customer</p>
+                  <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{order.customer.name}</p>
+                  <p className="text-[10px] text-gray-500 truncate">{order.customer.phone}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">Items</p>
+                  <p className="text-xs font-bold text-gray-900 dark:text-white">
+                    {order.items.length} item{order.items.length !== 1 ? "s" : ""}
+                  </p>
+                  <p className="text-[10px] text-gray-500 truncate">
+                    {order.items[0]?.name}
+                    {order.items.length > 1 ? ` +${order.items.length - 1} more` : ""}
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer — payment + total + actions */}
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                    <PaymentBadge status={order.paymentStatus} />
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">
+                      {order.paymentMethod === "cod" ? "COD"
+                        : order.paymentMethod === "upi" ? "UPI"
+                        : order.paymentMethod === "card" ? "Card"
+                        : order.paymentMethod === "wallet" ? "Wallet"
+                        : "Online"}
+                    </span>
+                  </div>
+                  <p className="text-lg font-extrabold text-gray-900 dark:text-white leading-none">
+                    ₹{order.total}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setViewOrder(order)}
+                    className="px-3 py-2 rounded-lg bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 text-xs font-extrabold transition-colors active:bg-cyan-100 dark:active:bg-cyan-500/20"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => handleDelete(order._id)}
+                    disabled={deleteOrder.isPending}
+                    aria-label="Delete order"
+                    className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center transition-colors active:bg-red-100 disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-2xl bg-white/80 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/[0.06] py-12 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-white/[0.06] mb-4">
+              <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+            </div>
+            <p className="text-gray-500 dark:text-gray-400 font-medium">No orders found</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {statusFilter !== "all" ? "Try a different filter." : "Orders will appear here."}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ─── DESKTOP: table (md+) ──────────────────────────────── */}
+      <div className="hidden md:block rounded-2xl bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm border border-gray-200/60 dark:border-white/[0.06] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200/60 dark:border-white/[0.06]">
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Order</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">Customer</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">Items</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Customer</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Items</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Status</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">Payment</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">Total</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Total</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Actions</th>
               </tr>
             </thead>
@@ -411,13 +527,13 @@ export default function AdminOrders() {
                         </p>
                       </div>
                     </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
+                    <td className="px-4 py-3">
                       <div>
                         <p className="font-medium text-gray-900 dark:text-white text-xs truncate max-w-[140px]">{order.customer.name}</p>
                         <p className="text-[10px] text-gray-400 truncate max-w-[140px]">{order.customer.phone}</p>
                       </div>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
+                    <td className="px-4 py-3">
                       <span className="text-xs text-gray-600 dark:text-gray-400">
                         {order.items.length} item{order.items.length !== 1 ? "s" : ""}
                       </span>
@@ -428,10 +544,16 @@ export default function AdminOrders() {
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <div className="flex flex-col gap-1">
                         <PaymentBadge status={order.paymentStatus} />
-                        <span className="text-[10px] text-gray-400 capitalize">{order.paymentMethod === "cod" ? "COD" : "Online"}</span>
+                        <span className="text-[10px] text-gray-400 capitalize">
+                          {order.paymentMethod === "cod" ? "COD"
+                            : order.paymentMethod === "upi" ? "UPI"
+                            : order.paymentMethod === "card" ? "Card"
+                            : order.paymentMethod === "wallet" ? "Wallet"
+                            : "Online"}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-right">
+                    <td className="px-4 py-3 text-right">
                       <span className="font-bold text-gray-900 dark:text-white">₹{order.total}</span>
                     </td>
                     <td className="px-4 py-3">

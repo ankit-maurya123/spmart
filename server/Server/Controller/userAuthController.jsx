@@ -13,6 +13,7 @@ const sanitize = (u) => ({
   addresses:     u.addresses || [],
   wishlist:      u.wishlist || [],
   notifications: u.notifications || { email: true, sms: false, offers: true, orderUpd: true },
+  walletBalance: u.walletBalance || 0,
   createdAt:     u.createdAt,
 });
 
@@ -292,6 +293,67 @@ exports.toggleWishlist = async (req, res) => {
 
     await user.save();
     res.status(200).json({ added, wishlist: user.wishlist });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/* ───────────────────── WALLET ───────────────────── */
+
+// GET /api/user/wallet — balance + transaction history (newest first)
+exports.getWallet = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select(
+      'walletBalance walletTransactions'
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const txns = (user.walletTransactions || [])
+      .slice()
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.status(200).json({
+      balance: user.walletBalance || 0,
+      transactions: txns,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// POST /api/user/wallet/topup — add money (simulated payment success)
+// Body: { amount, method } where method ∈ upi | card | netbanking
+exports.topupWallet = async (req, res) => {
+  try {
+    const amountNum = Math.floor(Number(req.body?.amount));
+    const method = ['upi', 'card', 'netbanking'].includes(req.body?.method)
+      ? req.body.method
+      : 'upi';
+
+    if (!Number.isFinite(amountNum) || amountNum < 10) {
+      return res.status(400).json({ error: 'Minimum top-up amount is ₹10.' });
+    }
+    if (amountNum > 50000) {
+      return res.status(400).json({ error: 'Maximum single top-up is ₹50,000.' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.walletBalance = (user.walletBalance || 0) + amountNum;
+    user.walletTransactions.push({
+      type: 'credit',
+      amount: amountNum,
+      reason: `Money added via ${method.toUpperCase()}`,
+      method,
+      status: 'success',
+    });
+    await user.save();
+
+    res.status(200).json({
+      balance: user.walletBalance,
+      transactions: user.walletTransactions
+        .slice()
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

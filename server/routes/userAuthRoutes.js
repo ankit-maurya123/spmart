@@ -14,8 +14,11 @@ const {
   // Wishlist
   getWishlist,
   toggleWishlist,
+  // Wallet
+  getWallet,
+  topupWallet,
 } = require('../Server/Controller/userAuthController.jsx');
-const { getMyOrders } = require('../Server/Controller/orderController.jsx');
+const { getMyOrders, cancelMyOrder } = require('../Server/Controller/orderController.jsx');
 const { requireUser } = require('../Server/middleware/userAuth.jsx');
 
 // ───── Auth ─────
@@ -29,6 +32,7 @@ router.post('/change-password', requireUser, changePassword);
 
 // ───── Orders (mine) ─────
 router.get('/orders', requireUser, getMyOrders);
+router.post('/orders/:orderNumber/cancel', requireUser, cancelMyOrder);
 
 // ───── Addresses ─────
 router.get('/addresses',                requireUser, listAddresses);
@@ -39,5 +43,9 @@ router.delete('/addresses/:addressId',  requireUser, deleteAddress);
 // ───── Wishlist ─────
 router.get('/wishlist',                 requireUser, getWishlist);
 router.post('/wishlist/:productId',     requireUser, toggleWishlist);
+
+// ───── Wallet ─────
+router.get('/wallet',                   requireUser, getWallet);
+router.post('/wallet/topup',            requireUser, topupWallet);
 
 module.exports = router;

@@ -16,4 +16,20 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // Split heavy vendor libs into separate chunks so they cache independently
+    // and don't get re-downloaded when app code changes.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'query-vendor': ['@tanstack/react-query'],
+          'chart-vendor': ['recharts'],
+          'http-vendor': ['axios'],
+        },
+      },
+    },
+    // Warn at 600kB instead of the default 500kB — vendor chunks are naturally larger
+    chunkSizeWarningLimit: 600,
+  },
 })

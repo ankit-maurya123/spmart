@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import {
   useDashboardStats,
   useRecentReviews,
@@ -5,6 +6,7 @@ import {
   useTopProducts,
   useCategoryStats,
 } from "../../hooks/useAdmin";
+import { useProducts } from "../../hooks/useProducts";
 import { resolveProductImage } from "../../lib/imageMap";
 import {
   AreaChart,
@@ -118,6 +120,21 @@ export default function Dashboard() {
   const { data: monthlyReviews, isLoading: monthlyLoading } = useMonthlyReviews();
   const { data: topProducts, isLoading: topLoading } = useTopProducts();
   const { data: categories, isLoading: catLoading } = useCategoryStats();
+  const { data: allProducts, isLoading: productsLoading } = useProducts();
+
+  // Stock alerts — out-of-stock + low-stock (≤5) buckets
+  const stockAlerts = (() => {
+    if (!allProducts) return { out: [], low: [] };
+    const out = [];
+    const low = [];
+    for (const p of allProducts) {
+      const s = typeof p.stock === "number" ? p.stock : 100;
+      if (s === 0) out.push(p);
+      else if (s <= 5) low.push(p);
+    }
+    return { out, low };
+  })();
+  const totalAlerts = stockAlerts.out.length + stockAlerts.low.length;
 
   return (
     <div className="space-y-6">
@@ -222,6 +239,74 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* ── Row 2.5: Stock Alerts ─────────────────────── */}
+      {!productsLoading && totalAlerts > 0 && (
+        <Card>
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </span>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">Stock Alerts</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  <span className="text-rose-600 dark:text-rose-400 font-bold">{stockAlerts.out.length}</span> out of stock ·{" "}
+                  <span className="text-amber-600 dark:text-amber-400 font-bold">{stockAlerts.low.length}</span> low
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/admin/products"
+              className="text-xs font-bold text-cyan-600 dark:text-cyan-300 hover:underline whitespace-nowrap"
+            >
+              Restock →
+            </Link>
+          </div>
+
+          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+            {[...stockAlerts.out, ...stockAlerts.low].slice(0, 8).map((p) => {
+              const s = typeof p.stock === "number" ? p.stock : 100;
+              const isOut = s === 0;
+              return (
+                <Link
+                  to={`/admin/products?category=${encodeURIComponent(p.category)}`}
+                  key={p._id}
+                  className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-200/60 dark:border-white/[0.06] hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors"
+                >
+                  <img
+                    src={resolveProductImage(p)}
+                    alt={p.name}
+                    className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-gray-200 dark:border-white/10"
+                    loading="lazy"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{p.name}</p>
+                    <p className="text-[10px] text-gray-400">{p.category}</p>
+                  </div>
+                  <span
+                    className={`px-2 py-1 rounded-full text-[10px] font-extrabold uppercase whitespace-nowrap ${
+                      isOut
+                        ? "bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                        : "bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                    }`}
+                  >
+                    {isOut ? "Sold Out" : `${s} left`}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {totalAlerts > 8 && (
+            <p className="text-[11px] text-gray-400 text-center mt-3">
+              +{totalAlerts - 8} more — view all in Products
+            </p>
+          )}
+        </Card>
+      )}
+
       {/* ── Row 3: Lists ──────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Recent Reviews */}
@@ -303,7 +388,7 @@ export default function Dashboard() {
                     {/* Price + category */}
                     <div className="text-right flex-shrink-0">
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        ${p.price}
+                        ₹{p.price}
                       </p>
                       <span className="text-xs text-gray-400 dark:text-gray-500">{p.category}</span>
                     </div>

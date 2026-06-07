@@ -25,6 +25,9 @@ const productSchema = new mongoose.Schema(
 
     // Reviews
     rating: { type: Number, min: 0, max: 5, default: 0 },
+
+    // Inventory — 0 means out of stock; default 100 keeps existing seed data in-stock.
+    stock: { type: Number, default: 100, min: 0 },
   },
   { timestamps: true }
 );

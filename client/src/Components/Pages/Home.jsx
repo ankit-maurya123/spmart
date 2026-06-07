@@ -2,13 +2,35 @@ import React from "react";
 import { Link } from "react-router-dom";
 import usePageMeta from "../../hooks/usePageMeta";
 import ProductSlider from "../ui/ProductSlider";
-import CategoryCircles from "../ui/CategoryCircles";
-import BannerCarousel from "../ui/BannerCarousel";
 import HeroPromoBanners from "../ui/HeroPromoBanners";
 import TopBrands from "../ui/TopBrands";
 import { useProducts, useCategories } from "../../hooks/useProducts";
 import { useLatestReviews } from "../../hooks/useReviews";
 import { resolveProductImage } from "../../lib/imageMap";
+
+// Friendly subtitles for known categories (kept short — Zepto-style)
+const CATEGORY_SUBTITLE = {
+  Fruits: "Fresh, juicy and hand-picked daily",
+  Vegetables: "Farm-fresh, hand-picked daily",
+  Milk: "Fresh dairy delivered cold",
+  "Milk Products": "Curd, paneer, cheese & spreads",
+  "Breads & Bakery": "Soft, fresh & baked today",
+  "Chips & Namkeens": "Crispy snacks & munchies",
+  Biscuits: "Tea-time favourites",
+  "Cold Drinks": "Chilled & refreshing",
+  "Top Picks for Oral Care": "Daily dental essentials",
+  "Chocolate & Candies": "Sweet treats for everyone",
+  Juices: "100% real fruit goodness",
+  "Energy Drinks": "Power-up your day",
+  "Noodles Pasta Vermicelli": "Quick & filling meals",
+  "Top Picks for Skin & Hair Care": "Everyday beauty essentials",
+  "Tea & Coffee": "Brew your perfect cup",
+  "Ready To Cook & Eat": "Meals in minutes",
+  Frozen: "Frozen & ready when you are",
+  "Atta, Sooji & Flours": "Pantry staples for every kitchen",
+  "Sugar & Spices": "Authentic flavours, daily essentials",
+  "Oil & Ghee": "Pure cooking oils & ghee",
+};
 
 const features = [
   { icon: "🚚", title: "Free Delivery", desc: "On orders above ₹499" },
@@ -16,20 +38,6 @@ const features = [
   { icon: "💰", title: "Best Prices",   desc: "Lowest price guaranteed" },
   { icon: "🔄", title: "Easy Returns",  desc: "7-day return policy" },
 ];
-
-const CATEGORY_META = {
-  Oil:        { icon: "🫒", bg: "bg-yellow-50",  border: "border-yellow-200" },
-  Spices:     { icon: "🌶️", bg: "bg-red-50",     border: "border-red-200" },
-  Flour:      { icon: "🌾", bg: "bg-amber-50",   border: "border-amber-200" },
-  Dairy:      { icon: "🥛", bg: "bg-blue-50",    border: "border-blue-200" },
-  Snacks:     { icon: "🍿", bg: "bg-purple-50",  border: "border-purple-200" },
-  Vegetables: { icon: "🥦", bg: "bg-green-50",   border: "border-green-200" },
-  Noodles:    { icon: "🍜", bg: "bg-orange-50",  border: "border-orange-200" },
-  Essentials: { icon: "🧂", bg: "bg-cyan-50",    border: "border-cyan-200" },
-  Beverages:  { icon: "☕", bg: "bg-pink-50",    border: "border-pink-200" },
-};
-
-const DEFAULT_CATEGORY_META = { icon: "📦", bg: "bg-gray-50", border: "border-gray-200" };
 
 // Skeleton card for loading state
 const SkeletonCard = () => (
@@ -59,6 +67,29 @@ const SliderSkeleton = ({ titleWidth = "w-48" }) => (
   </section>
 );
 
+// "Coming soon" placeholder for categories without products yet.
+const EmptyCategorySection = ({ name }) => (
+  <section className="max-w-[1280px] mx-auto px-3 sm:px-4 my-8 sm:my-10">
+    <div className="flex items-end justify-between gap-3 mb-3 sm:mb-4">
+      <div className="min-w-0">
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">
+          {name}
+        </h2>
+        <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Coming soon</p>
+      </div>
+    </div>
+    <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-8 sm:py-10 flex flex-col items-center justify-center text-center">
+      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white border border-gray-200 flex items-center justify-center text-2xl sm:text-3xl mb-3">
+        🛒
+      </div>
+      <p className="text-sm font-semibold text-gray-700">Products coming soon</p>
+      <p className="text-xs text-gray-500 mt-1 max-w-xs">
+        We're stocking up our <span className="font-semibold">{name}</span> shelves. Check back shortly!
+      </p>
+    </div>
+  </section>
+);
+
 const Home = () => {
   usePageMeta({
     title: null, // use the default homepage title
@@ -70,61 +101,48 @@ const Home = () => {
   const { data: categories } = useCategories();
   const { data: latestReviews } = useLatestReviews();
 
-  // Group products by category for stacked Zepto-style sliders
-  const byCategory = (cat) =>
-    (allProducts || []).filter((p) => p.category === cat);
+  // Bucket products by category for fast lookup
+  const byCategory = React.useMemo(() => {
+    const map = new Map();
+    (allProducts || []).forEach((p) => {
+      if (!map.has(p.category)) map.set(p.category, []);
+      map.get(p.category).push(p);
+    });
+    return map;
+  }, [allProducts]);
 
-  const findByName = (n) => allProducts?.find((p) => p.name === n);
-  const heroFeatured = findByName("Amul Pure Ghee");
-  const heroSide1    = findByName("Aashirvaad Atta");
-  const heroSide2    = findByName("Fortune Mustard Oil");
+  // Bestsellers strip — only render when we actually have flagged products
+  const bestsellers = (allProducts || []).filter(
+    (p) => p.tags?.includes("Bestseller") || p.tags?.includes("Top Pick")
+  );
 
-  // Sections in display order — Zepto-style category stacking
-  const PRODUCT_SECTIONS = [
-    { title: "Best Sellers",        subtitle: "Top picks loved by customers", source: "tag-bestseller" },
-    { title: "Fresh Vegetables",    subtitle: "Farm-fresh, hand-picked daily", category: "Vegetables" },
-    { title: "Cooking Oils",        subtitle: "Premium oils for everyday cooking", category: "Oil" },
-    { title: "Dairy & Spreads",     subtitle: "Pure & fresh dairy essentials", category: "Dairy" },
-    { title: "Atta, Rice & Dals",   subtitle: "Pantry must-haves at lowest prices", category: "Flour" },
-    { title: "Snacks & Munchies",   subtitle: "Crispies, biscuits & much more", category: "Snacks" },
-    { title: "Tea, Coffee & More",  subtitle: "Brew your perfect cup",          category: "Beverages" },
-    { title: "Spices & Masalas",    subtitle: "Authentic flavours for your kitchen", category: "Spices" },
-    { title: "Daily Essentials",    subtitle: "Salt, sugar, dals & staples",   category: "Essentials" },
-  ];
-
-  const resolveSectionProducts = (s) => {
-    if (s.source === "tag-bestseller") {
-      return (allProducts || []).filter(
-        (p) => p.tags?.includes("Bestseller") || p.tags?.includes("Top Pick")
-      );
-    }
-    return byCategory(s.category);
-  };
+  // Order: pinned categories first (Fruits, Vegetables, Milk — real product photos),
+  // then remaining populated categories (alphabetical), then empty ones.
+  const PINNED = ["Fruits", "Vegetables", "Milk"];
+  const orderedCategories = React.useMemo(() => {
+    if (!categories) return [];
+    const withCounts = categories.map((name) => ({
+      name,
+      count: byCategory.get(name)?.length || 0,
+    }));
+    const pinned = PINNED
+      .map((name) => withCounts.find((c) => c.name === name))
+      .filter((c) => c && c.count > 0);
+    const rest = withCounts.filter(
+      (c) => c.count > 0 && !PINNED.includes(c.name)
+    );
+    const empty = withCounts.filter((c) => c.count === 0);
+    return [
+      ...pinned,
+      ...rest.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+      ...empty.sort((a, b) => a.name.localeCompare(b.name)),
+    ];
+  }, [categories, byCategory]);
 
   return (
     <>
-      {/* ===== CATEGORY CIRCLES (right under header) ===== */}
-      {categories && categories.length > 0 && (
-        <CategoryCircles
-          categories={categories.map((cat) => {
-            const meta = CATEGORY_META[cat] || DEFAULT_CATEGORY_META;
-            return {
-              name: cat,
-              icon: meta.icon,
-              to: `/store?category=${encodeURIComponent(cat)}`,
-              bg: meta.bg,
-            };
-          })}
-        />
-      )}
-
-      {/* ===== AUTO-ROTATING BANNER CAROUSEL ===== */}
-      <BannerCarousel products={allProducts || []} />
-
-      {/* ===== TWIN PROMO BANNERS (₹0 Fees + Kirana Corner) ===== */}
-      <HeroPromoBanners
-        products={[heroFeatured, heroSide1, heroSide2].filter(Boolean)}
-      />
+      {/* ===== THREE-UP PROMO BANNER ROW ===== */}
+      <HeroPromoBanners />
 
       {/* ===== FEATURES STRIP ===== */}
       <section className="max-w-[1280px] mx-auto px-3 sm:px-4 mt-6 sm:mt-8">
@@ -147,25 +165,34 @@ const Home = () => {
       </section>
 
       {/* ===== STACKED CATEGORIZED PRODUCT SLIDERS ===== */}
-      {isLoading
-        ? Array.from({ length: 4 }).map((_, i) => <SliderSkeleton key={i} />)
-        : PRODUCT_SECTIONS.map((s) => {
-            const items = resolveSectionProducts(s);
-            if (!items.length) return null;
-            return (
+      {isLoading ? (
+        Array.from({ length: 4 }).map((_, i) => <SliderSkeleton key={i} />)
+      ) : (
+        <>
+          {bestsellers.length > 0 && (
+            <ProductSlider
+              title="Best Sellers"
+              subtitle="Top picks loved by customers"
+              products={bestsellers}
+              seeAllTo="/store"
+            />
+          )}
+
+          {orderedCategories.map(({ name, count }) =>
+            count > 0 ? (
               <ProductSlider
-                key={s.title}
-                title={s.title}
-                subtitle={s.subtitle}
-                products={items}
-                seeAllTo={
-                  s.category
-                    ? `/store?category=${encodeURIComponent(s.category)}`
-                    : "/store"
-                }
+                key={name}
+                title={name}
+                subtitle={CATEGORY_SUBTITLE[name] || "Top picks for you"}
+                products={byCategory.get(name)}
+                seeAllTo={`/store?category=${encodeURIComponent(name)}`}
               />
-            );
-          })}
+            ) : (
+              <EmptyCategorySection key={name} name={name} />
+            )
+          )}
+        </>
+      )}
 
       {/* ===== TOP BRANDS (replaces old Shop-by-Category grid) ===== */}
       {!isLoading && (

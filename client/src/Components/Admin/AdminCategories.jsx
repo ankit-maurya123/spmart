@@ -1,21 +1,28 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useCategoryStats, useAddCategory, useDeleteCategory } from "../../hooks/useAdmin";
 
 const CATEGORY_META = {
-  Oil: { icon: "🫒" },
-  Spices: { icon: "🌶️" },
-  Flour: { icon: "🌾" },
-  Dairy: { icon: "🥛" },
-  Snacks: { icon: "🍿" },
-  Vegetables: { icon: "🥦" },
-  Noodles: { icon: "🍜" },
-  Essentials: { icon: "🧂" },
-  Beverages: { icon: "☕" },
   Fruits: { icon: "🍎" },
-  Bakery: { icon: "🍞" },
+  Vegetables: { icon: "🥦" },
+  Milk: { icon: "🥛" },
+  "Milk Products": { icon: "🧀" },
+  "Breads & Bakery": { icon: "🍞" },
+  "Chips & Namkeens": { icon: "🍿" },
+  Biscuits: { icon: "🍪" },
+  "Cold Drinks": { icon: "🥤" },
+  "Top Picks for Oral Care": { icon: "🪥" },
+  "Chocolate & Candies": { icon: "🍫" },
+  Juices: { icon: "🧃" },
+  "Energy Drinks": { icon: "⚡" },
+  "Noodles Pasta Vermicelli": { icon: "🍜" },
+  "Top Picks for Skin & Hair Care": { icon: "🧴" },
+  "Tea & Coffee": { icon: "☕" },
+  "Ready To Cook & Eat": { icon: "🍱" },
   Frozen: { icon: "🧊" },
-  "Personal Care": { icon: "🧴" },
-  Cleaning: { icon: "🧹" },
+  "Atta, Sooji & Flours": { icon: "🌾" },
+  "Sugar & Spices": { icon: "🌶️" },
+  "Oil & Ghee": { icon: "🫒" },
 };
 
 const DEFAULT_ICON = "📦";
@@ -116,16 +123,22 @@ export default function AdminCategories() {
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => <CategorySkeleton key={i} />)
           : categories?.map((cat) => (
-              <div
+              <Link
                 key={cat.name}
-                className="group relative rounded-2xl bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm border border-gray-200/60 dark:border-white/[0.06] p-5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                to={`/admin/products?category=${encodeURIComponent(cat.name)}`}
+                className="group relative block rounded-2xl bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm border border-gray-200/60 dark:border-white/[0.06] p-5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-cyan-300 dark:hover:border-cyan-500/30 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                title={`View ${cat.name} products`}
               >
-                {/* Delete button — only for empty categories */}
+                {/* Delete button — only for empty categories. Stop propagation so the link doesn't fire. */}
                 {cat.count === 0 && (
                   <button
-                    onClick={() => handleDelete(cat.name)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDelete(cat.name);
+                    }}
                     disabled={deleteCategory.isPending}
-                    className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all disabled:opacity-50"
+                    className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all disabled:opacity-50 z-10"
                     title="Delete category"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -138,10 +151,12 @@ export default function AdminCategories() {
                   <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center text-xl">
                     {CATEGORY_META[cat.name]?.icon || DEFAULT_ICON}
                   </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">{cat.name}</h3>
-                    {cat.count === 0 && (
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">{cat.name}</h3>
+                    {cat.count === 0 ? (
                       <span className="text-[10px] text-gray-400 dark:text-gray-500">No products yet</span>
+                    ) : (
+                      <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium">Manage products →</span>
                     )}
                   </div>
                 </div>
@@ -159,7 +174,7 @@ export default function AdminCategories() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
       </div>
 

@@ -72,9 +72,9 @@ exports.deleteReview = async (req, res) => {
     const productId = review.productId;
     await Review.findByIdAndDelete(req.params.id);
 
-    // Recalculate product aggregate rating
+    // Recalculate product aggregate rating from approved reviews only
     const result = await Review.aggregate([
-      { $match: { productId: new mongoose.Types.ObjectId(productId) } },
+      { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
       { $group: { _id: '$productId', avgRating: { $avg: '$rating' } } },
     ]);
 
@@ -87,6 +87,39 @@ exports.deleteReview = async (req, res) => {
     }
 
     res.status(200).json({ message: 'Review deleted', avgRating: product?.rating ?? 0 });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// PATCH /api/admin/reviews/:id/status — Approve / reject a pending review
+exports.updateReviewStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const review = await Review.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    ).populate('productId', 'name image imageKey category');
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+
+    // Recalculate product aggregate rating from approved reviews only
+    const result = await Review.aggregate([
+      { $match: { productId: review.productId._id, status: 'approved' } },
+      { $group: { _id: '$productId', avgRating: { $avg: '$rating' } } },
+    ]);
+    const avgRating = result.length > 0
+      ? Math.round(result[0].avgRating * 10) / 10
+      : 0;
+    await Product.findByIdAndUpdate(review.productId._id, { rating: avgRating });
+
+    res.status(200).json({ review, avgRating });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -1,5 +1,6 @@
 const Order = require('../Model/order.jsx');
 const Product = require('../Model/product.jsx');
+const User = require('../Model/user.jsx');
 
 // POST /api/orders — Place a new order (public)
 exports.placeOrder = async (req, res) => {
@@ -17,8 +18,13 @@ exports.placeOrder = async (req, res) => {
       return res.status(400).json({ error: 'Order must contain at least one item.' });
     }
 
+    const method = ['cod', 'online', 'upi', 'card', 'wallet'].includes(paymentMethod)
+      ? paymentMethod
+      : 'cod';
+
     // Validate items against actual products and build order items
     const orderItems = [];
+    const productsToDecrement = []; // [{ product, quantity }]
     let subtotal = 0;
 
     for (const item of items) {
@@ -27,22 +33,60 @@ exports.placeOrder = async (req, res) => {
         return res.status(400).json({ error: `Product not found: ${item.productId}` });
       }
 
+      const qty = Math.max(1, Math.floor(Number(item.quantity) || 0));
+      const available = typeof product.stock === 'number' ? product.stock : 100;
+
+      if (available <= 0) {
+        return res.status(400).json({
+          error: `"${product.name}" is out of stock. Please remove it from your cart.`,
+        });
+      }
+      if (available < qty) {
+        return res.status(400).json({
+          error: `Only ${available} of "${product.name}" left in stock — please reduce the quantity.`,
+        });
+      }
+
       const orderItem = {
         productId: product._id,
         name: product.name,
         price: product.price,
-        quantity: item.quantity,
+        quantity: qty,
         image: product.image || '',
         imageKey: product.imageKey || '',
         category: product.category || '',
       };
 
       orderItems.push(orderItem);
-      subtotal += product.price * item.quantity;
+      productsToDecrement.push({ product, quantity: qty });
+      subtotal += product.price * qty;
     }
 
     const deliveryFee = subtotal >= 499 ? 0 : 40;
     const total = subtotal + deliveryFee;
+
+    // ── Wallet payment: must be logged in + have enough balance ──
+    let walletUser = null;
+    if (method === 'wallet') {
+      if (!req.userId) {
+        return res.status(401).json({ error: 'Sign in to pay with wallet.' });
+      }
+      walletUser = await User.findById(req.userId);
+      if (!walletUser) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+      if ((walletUser.walletBalance || 0) < total) {
+        return res.status(400).json({
+          error: `Insufficient wallet balance. You have ₹${walletUser.walletBalance || 0}, need ₹${total}.`,
+        });
+      }
+    }
+
+    // For UPI / card / wallet we mark paid immediately (simulated gateway).
+    // COD + "online" (legacy) stay pending until delivered.
+    const paymentStatus = ['upi', 'card', 'wallet'].includes(method)
+      ? 'paid'
+      : 'pending';
 
     const order = new Order({
       userId: req.userId || null,
@@ -52,12 +96,32 @@ exports.placeOrder = async (req, res) => {
       subtotal,
       deliveryFee,
       total,
-      paymentMethod: paymentMethod || 'cod',
-      paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending',
+      paymentMethod: method,
+      paymentStatus,
       notes: notes || '',
     });
 
     await order.save();
+
+    // Decrement product stock after successful save.
+    for (const { product, quantity } of productsToDecrement) {
+      product.stock = Math.max(0, (product.stock || 0) - quantity);
+      await product.save();
+    }
+
+    // After the order is saved, debit the wallet + record transaction.
+    if (method === 'wallet' && walletUser) {
+      walletUser.walletBalance = (walletUser.walletBalance || 0) - total;
+      walletUser.walletTransactions.push({
+        type: 'debit',
+        amount: total,
+        reason: `Used for order ${order.orderNumber}`,
+        orderNumber: order.orderNumber,
+        method: 'wallet',
+        status: 'success',
+      });
+      await walletUser.save();
+    }
 
     res.status(201).json(order);
   } catch (error) {
@@ -82,6 +146,60 @@ exports.trackOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: 'Order not found.' });
     }
+    res.status(200).json(order);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// POST /api/user/orders/:orderNumber/cancel — User cancels their own order
+exports.cancelMyOrder = async (req, res) => {
+  try {
+    const order = await Order.findOne({ orderNumber: req.params.orderNumber });
+    if (!order) return res.status(404).json({ error: 'Order not found.' });
+    if (String(order.userId) !== String(req.userId)) {
+      return res.status(403).json({ error: 'Not your order.' });
+    }
+    if (!['pending', 'confirmed'].includes(order.status)) {
+      return res.status(400).json({
+        error: 'Only pending or confirmed orders can be cancelled. Contact support for assistance.',
+      });
+    }
+
+    const wasPaid = order.paymentStatus === 'paid';
+    order.status = 'cancelled';
+    if (wasPaid) order.paymentStatus = 'refunded';
+    if (req.body?.reason) order.notes = `[Cancelled by user: ${String(req.body.reason).slice(0, 200)}] ${order.notes || ''}`.trim();
+    await order.save();
+
+    // Restore stock for each cancelled item.
+    for (const item of order.items) {
+      try {
+        const product = await Product.findById(item.productId);
+        if (product) {
+          product.stock = (product.stock || 0) + item.quantity;
+          await product.save();
+        }
+      } catch { /* skip — product may have been deleted since order */ }
+    }
+
+    // Refund: if this order was paid via wallet, credit the user back.
+    if (wasPaid && order.paymentMethod === 'wallet') {
+      const user = await User.findById(req.userId);
+      if (user) {
+        user.walletBalance = (user.walletBalance || 0) + order.total;
+        user.walletTransactions.push({
+          type: 'credit',
+          amount: order.total,
+          reason: `Refund for cancelled order ${order.orderNumber}`,
+          orderNumber: order.orderNumber,
+          method: 'wallet',
+          status: 'success',
+        });
+        await user.save();
+      }
+    }
+
     res.status(200).json(order);
   } catch (error) {
     res.status(500).json({ error: error.message });

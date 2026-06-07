@@ -1,6 +1,25 @@
 import { useState } from "react";
-import { useAllReviews, useDeleteReview } from "../../hooks/useAdmin";
+import {
+  useAllReviews,
+  useDeleteReview,
+  useUpdateReviewStatus,
+} from "../../hooks/useAdmin";
 import { resolveProductImage } from "../../lib/imageMap";
+
+const STATUS_STYLES = {
+  pending:  "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20",
+  approved: "bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20",
+  rejected: "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/20",
+};
+
+function StatusBadge({ status }) {
+  const s = status || "pending";
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-extrabold uppercase tracking-wider ${STATUS_STYLES[s]}`}>
+      {s}
+    </span>
+  );
+}
 
 function StarDisplay({ rating, size = "w-3.5 h-3.5" }) {
   return (
@@ -19,9 +38,10 @@ function StarDisplay({ rating, size = "w-3.5 h-3.5" }) {
   );
 }
 
-function ReviewModal({ review, onClose, onDelete, deleting }) {
+function ReviewModal({ review, onClose, onDelete, deleting, onApprove, onReject, updating }) {
   if (!review) return null;
 
+  const status = review.status || "pending";
   const product = review.productId;
   const productImage = product ? resolveProductImage(product) : null;
 
@@ -62,8 +82,8 @@ function ReviewModal({ review, onClose, onDelete, deleting }) {
             </div>
           </div>
 
-          {/* Rating */}
-          <div className="flex items-center gap-3">
+          {/* Rating + status */}
+          <div className="flex items-center gap-3 flex-wrap">
             <StarDisplay rating={review.rating} size="w-5 h-5" />
             <span className="px-2.5 py-1 rounded-lg bg-yellow-50 dark:bg-yellow-400/10 text-yellow-700 dark:text-yellow-400 text-xs font-bold">
               {review.rating}/5
@@ -71,6 +91,7 @@ function ReviewModal({ review, onClose, onDelete, deleting }) {
             <span className="text-xs text-gray-400">
               {["", "Poor", "Fair", "Good", "Very Good", "Excellent"][review.rating]}
             </span>
+            <StatusBadge status={status} />
           </div>
 
           {/* Comment */}
@@ -109,13 +130,37 @@ function ReviewModal({ review, onClose, onDelete, deleting }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-200/60 dark:border-white/[0.06]">
+        <div className="flex flex-wrap items-center justify-end gap-2.5 p-5 border-t border-gray-200/60 dark:border-white/[0.06]">
           <button
             onClick={onClose}
             className="px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
           >
             Close
           </button>
+          {status !== "approved" && (
+            <button
+              onClick={() => onApprove(review._id)}
+              disabled={updating}
+              className="px-4 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Approve
+            </button>
+          )}
+          {status !== "rejected" && (
+            <button
+              onClick={() => onReject(review._id)}
+              disabled={updating}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Reject
+            </button>
+          )}
           <button
             onClick={() => onDelete(review._id)}
             disabled={deleting}
@@ -124,7 +169,7 @@ function ReviewModal({ review, onClose, onDelete, deleting }) {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            {deleting ? "Deleting..." : "Delete Review"}
+            {deleting ? "Deleting..." : "Delete"}
           </button>
         </div>
       </div>
@@ -135,15 +180,28 @@ function ReviewModal({ review, onClose, onDelete, deleting }) {
 export default function AdminReviews() {
   const { data: reviews, isLoading } = useAllReviews();
   const deleteReview = useDeleteReview();
+  const updateStatus = useUpdateReviewStatus();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("pending"); // default to pending so admin sees the queue first
   const [viewReview, setViewReview] = useState(null);
+
+  const counts = reviews?.reduce(
+    (acc, r) => {
+      const s = r.status || "pending";
+      acc[s] = (acc[s] || 0) + 1;
+      acc.all += 1;
+      return acc;
+    },
+    { all: 0, pending: 0, approved: 0, rejected: 0 }
+  ) ?? { all: 0, pending: 0, approved: 0, rejected: 0 };
 
   const filtered = reviews?.filter((r) => {
     const q = search.toLowerCase();
-    return (
+    const matchSearch =
       r.name?.toLowerCase().includes(q) ||
-      r.productId?.name?.toLowerCase().includes(q)
-    );
+      r.productId?.name?.toLowerCase().includes(q);
+    const matchStatus = statusFilter === "all" || (r.status || "pending") === statusFilter;
+    return matchSearch && matchStatus;
   }) ?? [];
 
   const handleDelete = (id) => {
@@ -154,8 +212,43 @@ export default function AdminReviews() {
     }
   };
 
+  const handleApprove = (id) => updateStatus.mutate({ reviewId: id, status: "approved" });
+  const handleReject = (id) => updateStatus.mutate({ reviewId: id, status: "rejected" });
+
+  const TABS = [
+    { key: "pending",  label: "Pending",  count: counts.pending },
+    { key: "approved", label: "Approved", count: counts.approved },
+    { key: "rejected", label: "Rejected", count: counts.rejected },
+    { key: "all",      label: "All",      count: counts.all },
+  ];
+
   return (
     <div className="space-y-4">
+      {/* Tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
+        {TABS.map((t) => {
+          const active = statusFilter === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setStatusFilter(t.key)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-bold transition-colors whitespace-nowrap ${
+                active
+                  ? "bg-yellow-400 text-gray-900"
+                  : "bg-white dark:bg-white/[0.04] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/[0.1] hover:bg-gray-50 dark:hover:bg-white/[0.06]"
+              }`}
+            >
+              {t.label}
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                active ? "bg-gray-900/10 text-gray-900" : "bg-gray-100 dark:bg-white/[0.06] text-gray-600 dark:text-gray-400"
+              }`}>
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Top bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="relative w-full sm:w-72">
@@ -186,8 +279,9 @@ export default function AdminReviews() {
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Reviewer</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">Product</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Rating</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">Comment</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">Date</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Status</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">Comment</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden xl:table-cell">Date</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Actions</th>
               </tr>
             </thead>
@@ -198,12 +292,17 @@ export default function AdminReviews() {
                       <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full" /><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" /></div></td>
                       <td className="px-4 py-3 hidden sm:table-cell"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" /></td>
                       <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3 hidden md:table-cell"><div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3 hidden lg:table-cell"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="px-4 py-3 hidden lg:table-cell"><div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="px-4 py-3 hidden xl:table-cell"><div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" /></td>
                       <td className="px-4 py-3"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded ml-auto" /></td>
                     </tr>
                   ))
-                : filtered.map((r) => (
+                : filtered.map((r) => {
+                    const status = r.status || "pending";
+                    const isPending = status === "pending";
+                    const isApproved = status === "approved";
+                    return (
                     <tr key={r._id} className="hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -219,14 +318,53 @@ export default function AdminReviews() {
                       <td className="px-4 py-3">
                         <StarDisplay rating={r.rating} />
                       </td>
-                      <td className="px-4 py-3 hidden md:table-cell text-gray-600 dark:text-gray-400 truncate max-w-[200px]">
+                      <td className="px-4 py-3">
+                        <StatusBadge status={status} />
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-gray-600 dark:text-gray-400 truncate max-w-[200px]">
                         {r.comment}
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-gray-400 dark:text-gray-500 text-xs">
+                      <td className="px-4 py-3 hidden xl:table-cell text-gray-400 dark:text-gray-500 text-xs">
                         {new Date(r.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {!isApproved && (
+                            <button
+                              onClick={() => handleApprove(r._id)}
+                              disabled={updateStatus.isPending}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10 transition-colors disabled:opacity-50"
+                              title="Approve review"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
+                          )}
+                          {!isPending && status !== "rejected" && (
+                            <button
+                              onClick={() => handleReject(r._id)}
+                              disabled={updateStatus.isPending}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                              title="Reject (hide from product page)"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                          {isPending && (
+                            <button
+                              onClick={() => handleReject(r._id)}
+                              disabled={updateStatus.isPending}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                              title="Reject review"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
                           <button
                             onClick={() => setViewReview(r)}
                             className="p-1.5 rounded-lg text-gray-500 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 transition-colors"
@@ -250,7 +388,8 @@ export default function AdminReviews() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
             </tbody>
           </table>
         </div>
@@ -267,6 +406,13 @@ export default function AdminReviews() {
           onClose={() => setViewReview(null)}
           onDelete={handleDelete}
           deleting={deleteReview.isPending}
+          onApprove={(id) => updateStatus.mutate({ reviewId: id, status: "approved" }, {
+            onSuccess: () => setViewReview(null),
+          })}
+          onReject={(id) => updateStatus.mutate({ reviewId: id, status: "rejected" }, {
+            onSuccess: () => setViewReview(null),
+          })}
+          updating={updateStatus.isPending}
         />
       )}
     </div>

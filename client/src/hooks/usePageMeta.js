@@ -40,6 +40,23 @@ export function usePageMeta({ title, description, noIndex = false } = {}) {
     const [, prevDesc]    = setMeta("description", desc);
     const [, prevOgTitle] = setMeta("og:title", fullTitle, "property");
     const [, prevOgDesc]  = setMeta("og:description", desc, "property");
+    const [, prevTwTitle] = setMeta("twitter:title", fullTitle);
+    const [, prevTwDesc]  = setMeta("twitter:description", desc);
+
+    // Canonical URL — points to the current page (strip query for cleaner canonicals
+    // on filter/search pages so Google doesn't index every permutation).
+    const canonicalHref = `${window.location.origin}${window.location.pathname}`;
+    let canonicalEl = document.querySelector('link[rel="canonical"]');
+    const prevCanonical = canonicalEl?.getAttribute("href") ?? null;
+    if (!canonicalEl) {
+      canonicalEl = document.createElement("link");
+      canonicalEl.setAttribute("rel", "canonical");
+      document.head.appendChild(canonicalEl);
+    }
+    canonicalEl.setAttribute("href", canonicalHref);
+
+    // og:url — match canonical
+    const [, prevOgUrl] = setMeta("og:url", canonicalHref, "property");
 
     let robotsEl = null;
     let prevRobots = null;
@@ -49,12 +66,19 @@ export function usePageMeta({ title, description, noIndex = false } = {}) {
 
     return () => {
       document.title = prevTitle;
-      const descEl     = document.querySelector('meta[name="description"]');
-      const ogTitleEl  = document.querySelector('meta[property="og:title"]');
-      const ogDescEl   = document.querySelector('meta[property="og:description"]');
+      const descEl    = document.querySelector('meta[name="description"]');
+      const ogTitleEl = document.querySelector('meta[property="og:title"]');
+      const ogDescEl  = document.querySelector('meta[property="og:description"]');
+      const ogUrlEl   = document.querySelector('meta[property="og:url"]');
+      const twTitleEl = document.querySelector('meta[name="twitter:title"]');
+      const twDescEl  = document.querySelector('meta[name="twitter:description"]');
       if (descEl    && prevDesc    != null) descEl.setAttribute("content", prevDesc);
       if (ogTitleEl && prevOgTitle != null) ogTitleEl.setAttribute("content", prevOgTitle);
       if (ogDescEl  && prevOgDesc  != null) ogDescEl.setAttribute("content", prevOgDesc);
+      if (ogUrlEl   && prevOgUrl   != null) ogUrlEl.setAttribute("content", prevOgUrl);
+      if (twTitleEl && prevTwTitle != null) twTitleEl.setAttribute("content", prevTwTitle);
+      if (twDescEl  && prevTwDesc  != null) twDescEl.setAttribute("content", prevTwDesc);
+      if (canonicalEl && prevCanonical != null) canonicalEl.setAttribute("href", prevCanonical);
       if (robotsEl) {
         if (prevRobots != null) robotsEl.setAttribute("content", prevRobots);
         else robotsEl.remove();

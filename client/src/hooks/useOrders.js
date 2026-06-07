@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { authHeaders } from "../lib/api";
 
@@ -22,5 +22,24 @@ export function useOrder(orderNumber) {
       return data;
     },
     enabled: !!orderNumber,
+  });
+}
+
+/** Cancel the user's own order (pending/confirmed only). */
+export function useCancelOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ orderNumber, reason }) => {
+      const { data } = await axios.post(
+        `/api/user/orders/${orderNumber}/cancel`,
+        { reason },
+        authHeaders()
+      );
+      return data;
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData(["order", updated.orderNumber], updated);
+      qc.invalidateQueries({ queryKey: ["my-orders"] });
+    },
   });
 }

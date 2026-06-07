@@ -35,6 +35,49 @@ const parseExistingImages = (raw) => {
   }
 };
 
+// Tags can arrive as:
+//   - undefined (untouched on edit -> leave alone)
+//   - a single string ("Fresh") OR a JSON-stringified array ('[]' / '["Fresh","New"]')
+//   - an actual array (when multer collected multiple same-name fields)
+// Returns: string[] when defined, undefined when caller should skip.
+const normaliseTags = (raw) => {
+  if (raw === undefined) return undefined;
+  if (Array.isArray(raw)) {
+    return raw
+      .flatMap((v) => normaliseTags(v) ?? [])
+      .map((t) => String(t).trim())
+      .filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((t) => String(t).trim()).filter(Boolean);
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+    return [trimmed];
+  }
+  return [];
+};
+
+const coerceNumericFields = (data) => {
+  if (data.price !== undefined && data.price !== '') data.price = Number(data.price);
+  if (data.oldPrice !== undefined && data.oldPrice !== '') data.oldPrice = Number(data.oldPrice);
+  if (data.rating !== undefined && data.rating !== '') data.rating = Number(data.rating);
+  if (data.stock !== undefined && data.stock !== '') data.stock = Math.max(0, Math.floor(Number(data.stock)));
+
+  // Discard empty-string scalars so they don't overwrite valid DB values with NaN/""
+  if (data.oldPrice === '' || Number.isNaN(data.oldPrice)) delete data.oldPrice;
+  if (data.rating === '' || Number.isNaN(data.rating)) delete data.rating;
+  if (data.stock === '' || Number.isNaN(data.stock)) delete data.stock;
+};
+
 // ─── Add a new product ────────────────────────────────────────────────
 exports.addProduct = async (req, res) => {
   try {
@@ -57,8 +100,10 @@ exports.addProduct = async (req, res) => {
     // existingImages doesn't apply on add — strip it out so it isn't saved
     delete data.existingImages;
 
-    if (data.price) data.price = Number(data.price);
-    if (data.oldPrice) data.oldPrice = Number(data.oldPrice);
+    const tags = normaliseTags(data.tags);
+    if (tags !== undefined) data.tags = tags;
+
+    coerceNumericFields(data);
 
     const newProduct = new Product(data);
     await newProduct.save();
@@ -163,8 +208,10 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
-    if (data.price) data.price = Number(data.price);
-    if (data.oldPrice) data.oldPrice = Number(data.oldPrice);
+    const tags = normaliseTags(data.tags);
+    if (tags !== undefined) data.tags = tags;
+
+    coerceNumericFields(data);
 
     const product = await Product.findByIdAndUpdate(req.params.id, data, { new: true });
 

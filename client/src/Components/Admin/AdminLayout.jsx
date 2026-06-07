@@ -3,6 +3,7 @@ import { Outlet, Navigate } from "react-router-dom";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "./AdminSidebar";
 import AdminHeader from "./AdminHeader";
+import ScrollToTop from "../ScrollToTop";
 
 export default function AdminLayout() {
   const { admin, loading } = useAdminAuth();
@@ -25,6 +26,7 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#050510]">
+      <ScrollToTop />
       <AdminSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <AdminHeader onToggleSidebar={() => setSidebarOpen((p) => !p)} />
 

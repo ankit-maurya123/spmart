@@ -12,14 +12,19 @@ export function useReviews(productId) {
   });
 }
 
-export function useAddReview() {
+// Submitting a review now requires an authenticated user. The mutation
+// resolves to { review, message } and the review is created in 'pending'
+// status — it won't show up in the public list until an admin approves it.
+export function useAddReview(token) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (reviewData) => {
-      const { data } = await axios.post("/api/reviews", reviewData);
+      const { data } = await axios.post("/api/reviews", reviewData, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       return data;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["reviews", variables.productId] });
       queryClient.invalidateQueries({ queryKey: ["product", variables.productId] });
       queryClient.invalidateQueries({ queryKey: ["products"] });

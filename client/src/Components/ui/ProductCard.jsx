@@ -68,6 +68,12 @@ const ProductCard = ({ product }) => {
     : 0;
   const savings = product.oldPrice ? product.oldPrice - product.price : 0;
 
+  // Stock
+  const stock = typeof product.stock === "number" ? product.stock : 100;
+  const isOutOfStock = stock === 0;
+  const isLowStock = stock > 0 && stock <= 5;
+  const isAtCartLimit = qty >= stock;
+
   // Tags
   const isBestseller = product.tags?.some(
     (t) => /^bestseller$/i.test(t) || /^top pick$/i.test(t)
@@ -85,15 +91,10 @@ const ProductCard = ({ product }) => {
     return () => clearInterval(intervalRef.current);
   }, [hasSlider, isHovering, slides.length]);
 
-  const goTo = (e, i) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIndex(((i % slides.length) + slides.length) % slides.length);
-  };
-
   const handleAdd = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOutOfStock) return;
     if (product._id) addToCart(product);
   };
 
@@ -103,7 +104,9 @@ const ProductCard = ({ product }) => {
   //  Link mid-click and breaks navigation.)
   const cardBody = (
       <div
-        className="group relative h-full bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col transition-all hover:shadow-md hover:border-rose-200"
+        className={`group relative h-full bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col transition-all hover:shadow-md hover:border-rose-200 ${
+          isOutOfStock ? "opacity-90" : ""
+        }`}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
@@ -112,7 +115,7 @@ const ProductCard = ({ product }) => {
           <div className="relative aspect-square overflow-hidden bg-white">
             {/* Slides */}
             <div
-              className="flex h-full transition-transform duration-500 ease-out"
+              className={`flex h-full transition-transform duration-500 ease-out ${isOutOfStock ? "grayscale" : ""}`}
               style={{ transform: `translateX(-${index * 100}%)` }}
             >
               {slides.map((src, i) => (
@@ -127,8 +130,24 @@ const ProductCard = ({ product }) => {
               ))}
             </div>
 
+            {/* Out-of-stock overlay */}
+            {isOutOfStock && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px] pointer-events-none">
+                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-gray-900 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-md">
+                  Out of Stock
+                </span>
+              </div>
+            )}
+
+            {/* Low-stock badge — top-left */}
+            {!isOutOfStock && isLowStock && (
+              <span className="absolute top-1.5 left-0 z-10 inline-flex items-center px-2 py-0.5 rounded-r text-[9px] font-extrabold text-rose-700 bg-rose-100 shadow-sm uppercase tracking-wide animate-pulse">
+                Only {stock} left
+              </span>
+            )}
+
             {/* Bestseller ribbon — top-left, small corner-tag */}
-            {isBestseller && (
+            {!isLowStock && isBestseller && (
               <span className="absolute top-1.5 left-0 z-10 inline-flex items-center px-2 py-0.5 rounded-r text-[9px] font-extrabold text-stone-700 bg-amber-100 shadow-sm uppercase tracking-wide italic">
                 Bestseller
               </span>
@@ -162,51 +181,34 @@ const ProductCard = ({ product }) => {
               )}
             </button>
 
-            {/* Slider arrows — desktop hover only */}
-            {hasSlider && (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => goTo(e, index - 1)}
-                  aria-label="Previous image"
-                  className="hidden md:flex absolute left-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/95 backdrop-blur-sm shadow-md items-center justify-center text-gray-700 opacity-0 group-hover:opacity-100 hover:bg-rose-500 hover:text-white transition-all z-10"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.6}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => goTo(e, index + 1)}
-                  aria-label="Next image"
-                  className="hidden md:flex absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/95 backdrop-blur-sm shadow-md items-center justify-center text-gray-700 opacity-0 group-hover:opacity-100 hover:bg-rose-500 hover:text-white transition-all z-10"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.6}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-
-                {/* Dots */}
-                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">
-                  {slides.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={(e) => goTo(e, i)}
-                      aria-label={`Image ${i + 1}`}
-                      className={`h-1.5 rounded-full transition-all ${
-                        i === index ? "w-4 bg-rose-500" : "w-1.5 bg-gray-300 hover:bg-rose-300"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </>
+            {/* Image-cycle dots — only visible on hover (matches the hover-driven auto-cycle) */}
+            {hasSlider && isHovering && (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10 pointer-events-none">
+                {slides.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1 rounded-full transition-all ${
+                      i === index ? "w-3 bg-rose-500" : "w-1 bg-gray-300/80"
+                    }`}
+                  />
+                ))}
+              </div>
             )}
           </div>
 
           {/* ADD button — overlapping bottom-right of image */}
-          <div className="absolute -bottom-3 right-2 sm:right-2.5 z-20">
-            {qty > 0 ? (
+          <div className="absolute -bottom-2 right-2 sm:right-2.5 z-20">
+            {isOutOfStock ? (
+              <button
+                type="button"
+                disabled
+                aria-label="Out of stock"
+                className="px-3 sm:px-3.5 h-8 sm:h-9 rounded-lg bg-gray-100 border-[1.5px] border-gray-300 text-gray-500 text-[10px] font-extrabold uppercase tracking-wider cursor-not-allowed"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              >
+                Sold Out
+              </button>
+            ) : qty > 0 ? (
               <div
                 onClick={(e) => e.preventDefault()}
                 className="flex items-center bg-rose-500 rounded-lg shadow-md overflow-hidden h-8 sm:h-9 select-none"
@@ -232,10 +234,13 @@ const ProductCard = ({ product }) => {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    if (isAtCartLimit) return;
                     updateQuantity(product._id, qty + 1);
                   }}
-                  className="px-2 sm:px-2.5 h-full text-white font-extrabold text-sm sm:text-base hover:bg-rose-600 transition-colors"
+                  disabled={isAtCartLimit}
+                  className="px-2 sm:px-2.5 h-full text-white font-extrabold text-sm sm:text-base hover:bg-rose-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Increase"
+                  title={isAtCartLimit ? `Only ${stock} available` : ""}
                 >
                   +
                 </button>
@@ -254,7 +259,7 @@ const ProductCard = ({ product }) => {
         </div>
 
         {/* ──────── INFO ──────── */}
-        <div className="px-2 pt-4 pb-2.5 flex-1 flex flex-col">
+        <div className="px-2 pt-3 pb-2 flex-1 flex flex-col">
           {/* Price row: green pill + old price strikethrough */}
           <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-extrabold text-white bg-green-600 leading-none">
@@ -265,26 +270,25 @@ const ProductCard = ({ product }) => {
                 ₹{product.oldPrice}
               </span>
             )}
+            {/* Savings — moved inline with price to save a vertical row */}
+            {savings > 0 && (
+              <span className="text-[10px] text-green-700 font-bold ml-auto">
+                ₹{savings} OFF
+              </span>
+            )}
           </div>
 
-          {/* Savings line */}
-          {savings > 0 && (
-            <p className="text-[10px] text-green-700 font-bold mt-0.5">
-              ₹{savings} OFF
-            </p>
-          )}
-
           {/* Dashed divider */}
-          <div className="my-1.5 border-t border-dashed border-gray-300" />
+          <div className="my-1 border-t border-dashed border-gray-300" />
 
           {/* Product name */}
-          <h3 className="text-[12px] font-medium text-gray-900 leading-tight line-clamp-2 min-h-[2.4em]">
+          <h3 className="text-[12px] font-medium text-gray-900 leading-tight line-clamp-2 min-h-[2.2em]">
             {product.name}
           </h3>
 
           {/* Quantity */}
           {product.weight && (
-            <p className="text-[10px] text-gray-500 mt-0.5">
+            <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
               1 pack ({product.weight})
             </p>
           )}
@@ -292,27 +296,27 @@ const ProductCard = ({ product }) => {
           {/* Spacer pushes tag + rating to the bottom */}
           <div className="flex-1" />
 
-          {/* Tag pill (cyan/blue) — uses first non-bestseller tag */}
-          {otherTag && (
-            <span className="inline-flex items-center self-start mt-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold text-sky-700 bg-sky-100">
-              {otherTag}
-            </span>
-          )}
-
-          {/* Rating row with leaf icon + faux review count */}
-          {product.rating > 0 && (
-            <div className="flex items-center gap-1 mt-1">
-              <svg className="w-3 h-3 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-                <path d="M17.5 2.5c0 7-5 12-12.5 12.5l-2 .5C3.5 8.5 9 3 17.5 2.5z" />
-              </svg>
-              <span className="text-[11px] font-bold text-green-700">
-                {product.rating?.toFixed(1) || "4.5"}
+          {/* Tag + rating share one row to compress the footer */}
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {otherTag && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold text-sky-700 bg-sky-100 leading-none">
+                {otherTag}
               </span>
-              <span className="text-[10px] text-gray-500">
-                ({formatReviewCount(product)})
-              </span>
-            </div>
-          )}
+            )}
+            {product.rating > 0 && (
+              <div className="flex items-center gap-1 ml-auto">
+                <svg className="w-3 h-3 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                  <path d="M17.5 2.5c0 7-5 12-12.5 12.5l-2 .5C3.5 8.5 9 3 17.5 2.5z" />
+                </svg>
+                <span className="text-[11px] font-bold text-green-700 leading-none">
+                  {product.rating?.toFixed(1) || "4.5"}
+                </span>
+                <span className="text-[10px] text-gray-500 leading-none">
+                  ({formatReviewCount(product)})
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
   );

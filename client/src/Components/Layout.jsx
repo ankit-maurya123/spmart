@@ -3,6 +3,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import Footer from "./Footer";
 import MobileBottomNav from "./MobileBottomNav";
+import CartDrawer from "./ui/CartDrawer";
+import ScrollToTop from "./ScrollToTop";
 
 const Layout = () => {
   const [showTop, setShowTop] = useState(false);
@@ -23,6 +25,10 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen transition-colors duration-300">
+      {/* Reset scroll on every route change — must be inside BrowserRouter,
+          which Layout already is via the parent Routes. */}
+      <ScrollToTop />
+
       <Header />
 
       {/* Spacer to clear the fixed header.
@@ -32,7 +38,7 @@ const Layout = () => {
         aria-hidden
         className={
           isHome
-            ? "h-[114px] sm:h-[120px] md:h-[112px]"
+            ? "h-[116px] sm:h-[124px] md:h-[132px]"
             : "h-[52px] sm:h-[58px] md:h-[68px]"
         }
       />
@@ -67,6 +73,9 @@ const Layout = () => {
 
       {/* ===== Mobile bottom nav (with floating cart pill) ===== */}
       <MobileBottomNav />
+
+      {/* ===== Slide-out cart drawer ===== */}
+      <CartDrawer />
     </div>
   );
 };

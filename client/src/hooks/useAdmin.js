@@ -67,6 +67,23 @@ export function useDeleteReview() {
   });
 }
 
+// Approve / reject a pending review.
+export function useUpdateReviewStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ reviewId, status }) => {
+      const { data } = await axios.patch(`/api/admin/reviews/${reviewId}/status`, { status });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["latestReviews"] });
+    },
+  });
+}
+
 export function useAddProduct() {
   const queryClient = useQueryClient();
   return useMutation({

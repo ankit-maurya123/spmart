@@ -11,6 +11,18 @@ export const CartProvider = ({ children }) => {
   });
 
   const [toast, setToast] = useState(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  const openCart = useCallback(() => setIsCartOpen(true), []);
+  const closeCart = useCallback(() => setIsCartOpen(false), []);
+  const toggleCart = useCallback(() => setIsCartOpen((v) => !v), []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const prev = document.body.style.overflow;
+    if (isCartOpen) document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [isCartOpen]);
 
   useEffect(() => {
     localStorage.setItem("spmart-cart", JSON.stringify(items));
@@ -22,13 +34,30 @@ export const CartProvider = ({ children }) => {
   }, []);
 
   const addToCart = useCallback((product, quantity = 1) => {
+    // Block adding when the product is out of stock or doesn't exist.
+    if (product?.stock === 0) {
+      showToast(`"${product.name}" is out of stock`);
+      return;
+    }
     setItems((prev) => {
       const existing = prev.find((item) => item.product._id === product._id);
+      const nextQty = (existing?.quantity || 0) + quantity;
+
+      // Cap at available stock if known.
+      if (typeof product.stock === "number" && nextQty > product.stock) {
+        showToast(`Only ${product.stock} of "${product.name}" available`);
+        return existing
+          ? prev.map((i) =>
+              i.product._id === product._id ? { ...i, quantity: product.stock } : i
+            )
+          : prev.concat({ product, quantity: product.stock });
+      }
+
       if (existing) {
         showToast(`Updated "${product.name}" quantity in cart`);
         return prev.map((item) =>
           item.product._id === product._id
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: nextQty }
             : item
         );
       }
@@ -48,9 +77,13 @@ export const CartProvider = ({ children }) => {
   const updateQuantity = useCallback((productId, quantity) => {
     if (quantity < 1) return;
     setItems((prev) =>
-      prev.map((item) =>
-        item.product._id === productId ? { ...item, quantity } : item
-      )
+      prev.map((item) => {
+        if (item.product._id !== productId) return item;
+        // Cap at available stock if we know it.
+        const stock = item.product?.stock;
+        const next = typeof stock === "number" ? Math.min(quantity, stock) : quantity;
+        return { ...item, quantity: next };
+      })
     );
   }, []);
 
@@ -69,7 +102,7 @@ export const CartProvider = ({ children }) => {
 
   return (
     <CartContext.Provider
-      value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, getCartTotal, getCartCount }}
+      value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, getCartTotal, getCartCount, isCartOpen, openCart, closeCart, toggleCart }}
     >
       {children}
 

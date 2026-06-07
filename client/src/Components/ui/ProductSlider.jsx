@@ -51,7 +51,7 @@ const ProductSlider = ({ title, subtitle, products = [], seeAllTo }) => {
 
   return (
     <section className="relative max-w-[1280px] mx-auto px-3 sm:px-4 my-8 sm:my-10">
-      {/* Header — Zepto-style: big bold title, pink "See All →" */}
+      {/* Header — title on the left, "See All" on the right */}
       <div className="flex items-end justify-between gap-3 mb-3 sm:mb-4">
         <div className="min-w-0">
           {title && (
@@ -66,65 +66,68 @@ const ProductSlider = ({ title, subtitle, products = [], seeAllTo }) => {
           )}
         </div>
 
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {seeAllTo && (
-            <Link
-              to={seeAllTo}
-              className="inline-flex items-center gap-1 text-sm sm:text-base font-bold text-rose-500 hover:text-rose-600 transition-colors"
-            >
-              See All
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          )}
-          <div className="hidden md:flex items-center gap-1.5">
-            <button
-              onClick={() => scrollBy(-1)}
-              aria-label="Scroll left"
-              disabled={!canPrev}
-              className={`w-9 h-9 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 transition-all ${
-                canPrev
-                  ? "hover:bg-rose-500 hover:text-white hover:border-rose-500"
-                  : "opacity-40 cursor-not-allowed"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.6}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              onClick={() => scrollBy(1)}
-              aria-label="Scroll right"
-              disabled={!canNext}
-              className={`w-9 h-9 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 transition-all ${
-                canNext
-                  ? "hover:bg-rose-500 hover:text-white hover:border-rose-500"
-                  : "opacity-40 cursor-not-allowed"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.6}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        {seeAllTo && (
+          <Link
+            to={seeAllTo}
+            className="inline-flex items-center gap-1 text-sm sm:text-base font-bold text-rose-500 hover:text-rose-600 transition-colors flex-shrink-0"
+          >
+            See All
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        )}
       </div>
 
-      {/* Scrollable row — Zepto density: ~8 cards visible on desktop */}
-      <div
-        ref={scrollerRef}
-        className="no-scrollbar flex gap-2.5 sm:gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-3 -mx-1 px-1"
-      >
-        {products.map((p) => (
-          <div
-            key={p._id || p.name}
-            data-card
-            className="snap-start flex-shrink-0 w-[150px] sm:w-[165px] md:w-[175px] lg:w-[185px]"
-          >
-            <ProductCard product={p} />
-          </div>
-        ))}
+      {/* Scrollable row with side overlay arrows positioned in the upper image
+          area — well above the ADD button (which sits at the image's bottom). */}
+      <div className="relative">
+        {/* Prev arrow — left side, upper portion of card image */}
+        <button
+          onClick={() => scrollBy(-1)}
+          aria-label="Scroll left"
+          disabled={!canPrev}
+          className={`hidden md:flex absolute left-1 top-[28%] -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white border border-gray-200 shadow-lg items-center justify-center text-gray-800 transition-all ${
+            canPrev
+              ? "hover:bg-rose-500 hover:text-white hover:border-rose-500 hover:shadow-xl"
+              : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.6}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        {/* Next arrow — right side, upper portion of card image */}
+        <button
+          onClick={() => scrollBy(1)}
+          aria-label="Scroll right"
+          disabled={!canNext}
+          className={`hidden md:flex absolute right-1 top-[28%] -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white border border-gray-200 shadow-lg items-center justify-center text-gray-800 transition-all ${
+            canNext
+              ? "hover:bg-rose-500 hover:text-white hover:border-rose-500 hover:shadow-xl"
+              : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.6}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        <div
+          ref={scrollerRef}
+          className="no-scrollbar flex gap-2.5 sm:gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-3 -mx-1 px-1"
+        >
+          {products.map((p) => (
+            <div
+              key={p._id || p.name}
+              data-card
+              className="snap-start flex-shrink-0 w-[150px] sm:w-[165px] md:w-[175px] lg:w-[185px]"
+            >
+              <ProductCard product={p} />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

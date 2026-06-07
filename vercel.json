@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "buildCommand": "npm install --prefix server && vite build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "functions": {
+    "api/index.js": { "maxDuration": 30 }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/uploads/(.*)", "destination": "/api/index" }
+  ]
+}

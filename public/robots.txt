@@ -1,0 +1,19 @@
+# SPMart — robots.txt
+# Allow all crawlers to index public pages
+
+User-agent: *
+Allow: /
+
+# Block private/admin/checkout/account routes
+Disallow: /admin
+Disallow: /admin/
+Disallow: /manager
+Disallow: /manager/
+Disallow: /account
+Disallow: /account/
+Disallow: /checkout
+Disallow: /order-confirmation/
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://spmart.vercel.app/sitemap.xml
